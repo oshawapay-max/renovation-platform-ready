@@ -1,402 +1,449 @@
+
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  CheckCircle,
-  Hammer,
-  ClipboardCheck,
-  Users,
-  BarChart3,
-  ShieldCheck,
-  Upload,
-  Home,
   ArrowRight,
-  Star,
-  MessageCircle,
+  BarChart3,
   Building2,
-  Languages,
   Camera,
+  CheckCircle,
+  ClipboardCheck,
+  DollarSign,
+  Hammer,
+  Home,
+  Languages,
+  LineChart,
+  MessageCircle,
+  ShieldCheck,
+  Target,
   TrendingUp,
+  Upload,
+  Users,
 } from "lucide-react";
+import "./styles.css";
 
 const copy = {
   en: {
-    navHow: "How it works",
-    navEstimate: "Get Estimate",
-    navDashboard: "Dashboard",
-    navContractors: "Contractors",
-    start: "Start Project",
-    badge: "Ontario, Canada • Renovation-as-a-Service",
-    heroTitle: "Renovation clarity before you spend money.",
+    navOpportunity: "Opportunity",
+    navModel: "Business model",
+    navExample: "Example",
+    navRoadmap: "Roadmap",
+    lang: "RU",
+    badge: "Ontario, Canada • Partner Demo",
+    heroTitle: "Renovation diagnostics before money is wasted.",
     heroText:
-      "Built for investors and homeowners who need real renovation costs, trusted contractors, and full control before starting work.",
-    ctaEstimate: "Get Renovation Estimate",
-    ctaHow: "See How It Works",
-    investorLine: "Used by investors to increase ROI and reduce risk",
-    homeownerLine: "Used by homeowners to avoid budget overruns",
-    snapshot: "Project Snapshot",
-    active: "Active",
-    estimatedRenovation: "Estimated renovation",
-    platformRevenue: "Platform revenue",
-    targetProfit: "Target profit",
-    snapshotNote: "Diagnostics completed. Estimate and contractor matching in progress.",
-    whoTitle: "Built for investors and homeowners",
-    whoText:
-      "One platform, two core audiences: investors who need predictable numbers, and homeowners who need a safe renovation process.",
-    investors: "Investors",
-    investorsText: "Flip, rental and distressed property renovation planning.",
-    homeowners: "Homeowners",
-    homeownersText: "Repair, upgrade and manage home renovation with clarity.",
-    howTitle: "How it works",
-    howText: "A simple workflow designed to reduce risk, create transparency and control renovation delivery.",
-    estimateTitle: "Get an estimate",
-    estimateText:
-      "Start with a simple request. The MVP focuses on real project intake and manual expert review.",
-    benefit1: "Clear project scope",
-    benefit2: "Diagnostics-based estimate",
-    benefit3: "Verified contractor matching",
-    benefit4: "Milestone control",
-    fullName: "Full name",
-    contact: "Email or phone",
-    address: "Property address / area",
-    describe: "Describe the renovation or problem",
-    upload: "Upload photos or videos",
-    submit: "Submit Request",
-    investorToggle: "I am an investor",
-    dashboardTitle: "Project dashboard",
-    dashboardText: "The client sees budget, milestones, documents and progress in one place.",
-    sample: "View sample project",
-    status: "Status",
-    budget: "Budget",
+      "A partner-ready MVP concept for turning unclear renovation projects into structured estimates, contractor matching, milestone control, and measurable revenue.",
+    primary: "Discuss Partnership",
+    secondary: "View Business Case",
+    proof1: "Manual-first MVP",
+    proof2: "Investor + homeowner market",
+    proof3: "Contractor network opportunity",
+    heroMetric1: "Sample project budget",
+    heroMetric2: "Platform revenue potential",
+    heroMetric3: "Target project profit",
+    opportunityTitle: "The market problem is not lack of contractors. It is lack of control.",
+    opportunityText:
+      "Homeowners and small investors often start renovation decisions without reliable diagnostics, real cost ranges, verified teams, or project control. The result is budget overruns, delays, and lost profit.",
+    problem1: "Unclear scope before work starts",
+    problem2: "Contractor quality is hard to verify",
+    problem3: "Budgets change after the client is already committed",
+    solutionTitle: "The platform becomes the control layer between client, estimate, and execution.",
+    solution1: "Diagnostics and intake",
+    solution2: "Estimate and risk review",
+    solution3: "Contractor matching",
+    solution4: "Milestone tracking",
+    modelTitle: "Simple business model for first validation",
+    modelText:
+      "The first version does not need a complex marketplace. It can operate manually with real inspections, controlled contractor relationships, and revenue from assessment, project management, and contractor coordination.",
+    revenue1: "Diagnostic fee",
+    revenue2: "Project management fee",
+    revenue3: "Contractor coordination margin",
+    partnerTitle: "Why this is a partner opportunity",
+    partnerText:
+      "The business can start lean: validate 3–5 real projects, build contractor relationships, document outcomes, then scale into software.",
+    partnerPoint1: "Low initial technical complexity",
+    partnerPoint2: "Real local market pain",
+    partnerPoint3: "Clear path from service business to platform",
+    executionBadge: "Execution layer",
+    executionTitle: "Real contractors. Controlled execution.",
+    executionText: "The platform connects renovation projects with verified contractors and keeps control over execution, timelines, and budget.",
+    executionPoint1: "Verified contractor network",
+    executionPoint2: "Project tracking and control",
+    executionPoint3: "Risk reduction through structured workflow",
+    resultBadge: "End result",
+    resultTitle: "From construction site to market-ready property.",
+    resultText: "Distressed or unclear renovation projects become high-quality, market-ready homes with predictable outcomes and clear financial logic.",
+    resultPoint1: "Higher resale value",
+    resultPoint2: "Faster project completion",
+    resultPoint3: "Improved investor returns",
+    exampleTitle: "Real Project Example",
+    exampleText:
+      "A client has a property that needs renovation but does not know the real cost, risks, or timeline. The platform converts uncertainty into a clear project plan.",
+    before: "Before",
+    after: "After",
+    estRenovation: "Estimated renovation",
     timeline: "Timeline",
-    contractors: "Contractors",
-    estimateReview: "Estimate Review",
-    matched: "3 matched",
-    verifiedTitle: "Verified contractors",
-    verifiedText: "The MVP uses a controlled contractor network instead of an open marketplace.",
-    leadTitle: "Lead processing logic",
-    lead1: "All users submit project requests",
-    lead2: "Investor vs homeowner classification",
-    lead3: "High-value projects processed first",
-    readyTitle: "Ready to validate the first projects?",
-    readyText:
-      "The MVP focuses on the first 3–5 real renovation cases before building a complex marketplace.",
-    startEstimate: "Start with first estimate",
-    manual: "Manual-first approach",
-    manualText: "No-code workflow, real inspections, real estimates.",
-    trust: "Trust before scale",
-    trustText: "Controlled contractors, milestone tracking and quality checks.",
-    visualTitle: "Visual layer",
-    visualText: "Real renovation visuals can be added later; this MVP uses clean startup graphics and construction-style UI."
+    revenue: "Platform revenue",
+    stepsTitle: "How the first version works",
+    step1: "Client submits project",
+    step2: "Manual diagnostic review",
+    step3: "Estimate and project plan",
+    step4: "Contractor matching",
+    step5: "Milestone control",
+    roadmapTitle: "MVP roadmap",
+    roadmapText:
+      "The goal is not to build everything first. The goal is to prove demand, process, economics, and partner roles.",
+    phase1: "Phase 1",
+    phase1Text: "Partner demo, landing page, intake form, manual review.",
+    phase2: "Phase 2",
+    phase2Text: "First 3–5 real renovation cases, contractor testing, case studies.",
+    phase3: "Phase 3",
+    phase3Text: "Client dashboard, contractor profiles, estimate logic, automation.",
+    ctaTitle: "Ready to validate the first renovation cases?",
+    ctaText:
+      "The next step is to use this demo as a conversation tool with a potential partner, then define roles, first clients, and a simple operating process.",
+    ctaButton: "Start partner discussion",
+    formName: "Name",
+    formContact: "Email or phone",
+    formMessage: "Message / project type",
+    formSubmit: "Send request"
   },
   ru: {
-    navHow: "Как работает",
-    navEstimate: "Получить оценку",
-    navDashboard: "Кабинет проекта",
-    navContractors: "Подрядчики",
-    start: "Начать проект",
-    badge: "Онтарио, Канада • Renovation-as-a-Service",
-    heroTitle: "Понимание ремонта до того, как вы тратите деньги.",
+    navOpportunity: "Возможность",
+    navModel: "Модель",
+    navExample: "Пример",
+    navRoadmap: "План",
+    lang: "EN",
+    badge: "Онтарио, Канада • Версия для партнёра",
+    heroTitle: "Диагностика ремонта до того, как деньги потрачены впустую.",
     heroText:
-      "Для инвесторов и владельцев: реальная стоимость ремонта, проверенные подрядчики и полный контроль до начала работ.",
-    ctaEstimate: "Получить оценку ремонта",
-    ctaHow: "Посмотреть процесс",
-    investorLine: "Используется инвесторами для увеличения прибыли и снижения рисков",
-    homeownerLine: "Используется владельцами для избежания перерасхода",
-    snapshot: "Карточка проекта",
-    active: "Активен",
-    estimatedRenovation: "Оценка ремонта",
-    platformRevenue: "Доход платформы",
-    targetProfit: "Целевая прибыль",
-    snapshotNote: "Диагностика завершена. Смета и подбор подрядчиков в процессе.",
-    whoTitle: "Для инвесторов и владельцев жилья",
-    whoText:
-      "Одна платформа для двух ключевых аудиторий: инвесторов, которым нужны понятные цифры, и владельцев, которым нужен безопасный ремонт.",
-    investors: "Инвесторы",
-    investorsText: "Flip, rental и проблемные объекты с прогнозируемым бюджетом.",
-    homeowners: "Владельцы жилья",
-    homeownersText: "Ремонт, обновление и управление проектом с прозрачностью.",
-    howTitle: "Как это работает",
-    howText: "Простой процесс, который снижает риски, даёт прозрачность и контроль реновации.",
-    estimateTitle: "Получить оценку",
-    estimateText:
-      "Начните с простой заявки. MVP делает фокус на реальных проектах и ручной экспертной проверке.",
-    benefit1: "Понятный объём работ",
-    benefit2: "Смета на основе диагностики",
-    benefit3: "Подбор проверенных подрядчиков",
-    benefit4: "Контроль этапов",
-    fullName: "Имя и фамилия",
-    contact: "Email или телефон",
-    address: "Адрес / район объекта",
-    describe: "Опишите ремонт или проблему",
-    upload: "Загрузить фото или видео",
-    submit: "Отправить заявку",
-    investorToggle: "Я инвестор",
-    dashboardTitle: "Кабинет проекта",
-    dashboardText: "Клиент видит бюджет, этапы, документы и прогресс в одном месте.",
-    sample: "Посмотреть пример проекта",
-    status: "Статус",
-    budget: "Бюджет",
-    timeline: "Сроки",
-    contractors: "Подрядчики",
-    estimateReview: "Проверка сметы",
-    matched: "3 подобраны",
-    verifiedTitle: "Проверенные подрядчики",
-    verifiedText: "На старте используется контролируемая сеть подрядчиков, а не открытый маркетплейс.",
-    leadTitle: "Логика обработки заявок",
-    lead1: "Все пользователи отправляют заявки",
-    lead2: "Классификация: инвестор или владелец",
-    lead3: "Приоритет получают проекты с высокой ценностью",
-    readyTitle: "Готовы проверить первые проекты?",
-    readyText:
-      "MVP фокусируется на первых 3–5 реальных кейсах до создания сложного маркетплейса.",
-    startEstimate: "Начать с первой оценки",
-    manual: "Сначала ручной процесс",
-    manualText: "No-code workflow, реальные осмотры и реальные сметы.",
-    trust: "Доверие перед масштабом",
-    trustText: "Контролируемые подрядчики, этапы и проверка качества.",
-    visualTitle: "Визуальный стиль",
-    visualText: "Реальные фото можно добавить позже; MVP использует чистую startup-графику и строительный стиль."
-  },
+      "Партнёрская MVP-концепция: превращаем непонятный ремонт в понятную смету, подбор подрядчиков, контроль этапов и измеримую выручку.",
+    primary: "Обсудить партнёрство",
+    secondary: "Посмотреть бизнес-кейс",
+    proof1: "MVP через ручной процесс",
+    proof2: "Рынок инвесторов и владельцев жилья",
+    proof3: "Возможность сети подрядчиков",
+    heroMetric1: "Бюджет примера",
+    heroMetric2: "Потенциальная выручка платформы",
+    heroMetric3: "Целевая прибыль проекта",
+    opportunityTitle: "Проблема рынка не в отсутствии подрядчиков. Проблема — в отсутствии контроля.",
+    opportunityText:
+      "Владельцы жилья и небольшие инвесторы часто начинают ремонт без диагностики, понятной стоимости, проверенной команды и контроля процесса. Итог — перерасход, задержки и потеря прибыли.",
+    problem1: "Непонятный объём работ до старта",
+    problem2: "Сложно проверить качество подрядчика",
+    problem3: "Бюджет меняется, когда клиент уже вовлечён",
+    solutionTitle: "Платформа становится слоем контроля между клиентом, сметой и выполнением.",
+    solution1: "Диагностика и заявка",
+    solution2: "Смета и проверка рисков",
+    solution3: "Подбор подрядчиков",
+    solution4: "Контроль этапов",
+    modelTitle: "Простая бизнес-модель для первой проверки",
+    modelText:
+      "На первом этапе не нужен сложный маркетплейс. Можно работать вручную: реальные осмотры, контролируемые подрядчики и доход от оценки, управления проектом и координации работ.",
+    revenue1: "Оплата диагностики",
+    revenue2: "Комиссия за управление проектом",
+    revenue3: "Маржа на координации подрядчиков",
+    partnerTitle: "Почему это партнёрская возможность",
+    partnerText:
+      "Бизнес можно запустить lean-подходом: проверить 3–5 реальных проектов, выстроить подрядчиков, зафиксировать кейсы и затем масштабировать в software-платформу.",
+    partnerPoint1: "Низкая техническая сложность на старте",
+    partnerPoint2: "Реальная локальная боль рынка",
+    partnerPoint3: "Путь от сервиса к платформе",
+    executionBadge: "Слой выполнения",
+    executionTitle: "Реальные подрядчики. Контролируемое выполнение.",
+    executionText: "Платформа связывает renovation-проекты с проверенными подрядчиками и сохраняет контроль над сроками, бюджетом и этапами работ.",
+    executionPoint1: "Проверенная сеть подрядчиков",
+    executionPoint2: "Контроль проекта и этапов",
+    executionPoint3: "Снижение рисков через структурированный процесс",
+    resultBadge: "Финальный результат",
+    resultTitle: "От стройки к объекту, готовому для рынка.",
+    resultText: "Проблемные или непонятные renovation-проекты превращаются в качественные, готовые для рынка объекты с понятной экономикой.",
+    resultPoint1: "Рост стоимости объекта",
+    resultPoint2: "Более быстрый срок завершения",
+    resultPoint3: "Улучшение доходности инвестора",
+    exampleTitle: "Пример реального проекта",
+    exampleText:
+      "Клиент имеет объект для ремонта, но не понимает реальную стоимость, риски и сроки. Платформа превращает неопределённость в понятный план проекта.",
+    before: "До",
+    after: "После",
+    estRenovation: "Оценка ремонта",
+    timeline: "Срок",
+    revenue: "Выручка платформы",
+    stepsTitle: "Как работает первая версия",
+    step1: "Клиент оставляет заявку",
+    step2: "Ручная диагностика",
+    step3: "Смета и план проекта",
+    step4: "Подбор подрядчиков",
+    step5: "Контроль этапов",
+    roadmapTitle: "План MVP",
+    roadmapText:
+      "Цель — не построить всё сразу. Цель — доказать спрос, процесс, экономику и роли партнёров.",
+    phase1: "Этап 1",
+    phase1Text: "Демо для партнёра, landing page, форма заявки, ручной разбор.",
+    phase2: "Этап 2",
+    phase2Text: "Первые 3–5 реальных кейсов, тест подрядчиков, case studies.",
+    phase3: "Этап 3",
+    phase3Text: "Кабинет клиента, профили подрядчиков, логика сметы, автоматизация.",
+    ctaTitle: "Готовы проверить первые renovation-кейсы?",
+    ctaText:
+      "Следующий шаг — использовать сайт как инструмент разговора с партнёром, затем определить роли, первых клиентов и простой операционный процесс.",
+    ctaButton: "Начать партнёрский разговор",
+    formName: "Имя",
+    formContact: "Email или телефон",
+    formMessage: "Сообщение / тип проекта",
+    formSubmit: "Отправить заявку"
+  }
 };
 
-function Button({ children, variant = "primary", className = "", ...props }) {
-  return (
-    <button className={`btn ${variant === "outline" ? "btn-outline" : "btn-primary"} ${className}`} {...props}>
-      {children}
-    </button>
-  );
+function Button({ children, variant = "primary" }) {
+  return <button className={`btn ${variant}`}>{children}</button>;
 }
 
 function Card({ children, className = "" }) {
   return <div className={`card ${className}`}>{children}</div>;
 }
 
-export default function RenovationPlatformMVP() {
+export default function App() {
   const [lang, setLang] = useState("en");
-  const [projectType, setProjectType] = useState("Investment / Flip");
-  const [isInvestor, setIsInvestor] = useState(false);
   const t = copy[lang];
 
-  const steps = [
-    { icon: Home, title: lang === "en" ? "Submit Property" : "Заявка по объекту", text: lang === "en" ? "Upload property details, photos, and renovation goals." : "Загрузите данные объекта, фото и цели ремонта." },
-    { icon: ClipboardCheck, title: lang === "en" ? "Diagnostics" : "Диагностика", text: lang === "en" ? "We inspect the property and define the real scope of work." : "Мы осматриваем объект и определяем реальный объём работ." },
-    { icon: BarChart3, title: lang === "en" ? "Estimate" : "Смета", text: lang === "en" ? "You receive a clear budget, timeline, and project roadmap." : "Вы получаете понятный бюджет, сроки и дорожную карту." },
-    { icon: Hammer, title: lang === "en" ? "Execution" : "Выполнение", text: lang === "en" ? "Verified contractors complete the work under structured control." : "Проверенные подрядчики выполняют работы под контролем." },
-    { icon: ShieldCheck, title: lang === "en" ? "Quality Control" : "Контроль качества", text: lang === "en" ? "Final inspection, documentation, and project completion." : "Финальная проверка, документы и закрытие проекта." },
+  const problemItems = [t.problem1, t.problem2, t.problem3];
+  const solutionItems = [
+    [ClipboardCheck, t.solution1],
+    [BarChart3, t.solution2],
+    [Users, t.solution3],
+    [ShieldCheck, t.solution4],
   ];
-
-  const contractors = [
-    { name: lang === "en" ? "General Contractor" : "Генеральный подрядчик", rating: "4.9", tag: lang === "en" ? "Full renovation" : "Полная реновация" },
-    { name: lang === "en" ? "Licensed Electrician" : "Лицензированный электрик", rating: "4.8", tag: lang === "en" ? "Electrical work" : "Электрика" },
-    { name: lang === "en" ? "Plumbing Specialist" : "Специалист по сантехнике", rating: "4.7", tag: lang === "en" ? "Plumbing / fixtures" : "Сантехника" },
+  const revenues = [
+    [DollarSign, t.revenue1],
+    [LineChart, t.revenue2],
+    [Hammer, t.revenue3],
   ];
-
-  const projectTypes = lang === "en" ? ["Investment / Flip", "Rental", "Home Repair"] : ["Инвестиция / Flip", "Аренда", "Домашний ремонт"];
+  const steps = [t.step1, t.step2, t.step3, t.step4, t.step5];
 
   return (
     <div className="site">
       <header className="header">
         <div className="container nav">
           <div className="logo">
-            <div className="logo-icon"><Hammer size={20} /></div>
+            <span><Hammer size={18} /></span>
             Renovation Platform
           </div>
-          <nav className="nav-links">
-            <a href="#how">{t.navHow}</a>
-            <a href="#estimate">{t.navEstimate}</a>
-            <a href="#dashboard">{t.navDashboard}</a>
-            <a href="#contractors">{t.navContractors}</a>
+          <nav>
+            <a href="#opportunity">{t.navOpportunity}</a>
+            <a href="#model">{t.navModel}</a>
+            <a href="#example">{t.navExample}</a>
+            <a href="#roadmap">{t.navRoadmap}</a>
           </nav>
-          <div className="nav-actions">
-            <button onClick={() => setLang(lang === "en" ? "ru" : "en")} className="language-btn">
-              <Languages size={16} /> {lang === "en" ? "RU" : "EN"}
-            </button>
-            <Button>{t.start}</Button>
-          </div>
+          <button className="lang" onClick={() => setLang(lang === "en" ? "ru" : "en")}>
+            <Languages size={16} /> {t.lang}
+          </button>
         </div>
       </header>
 
       <section className="hero">
-        <div className="hero-pattern" />
-        <div className="container hero-grid">
-          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <div className="container heroGrid">
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
             <div className="badge">{t.badge}</div>
             <h1>{t.heroTitle}</h1>
-            <p className="hero-text">{t.heroText}</p>
-            <div className="strategic-lines">
-              <div><TrendingUp size={20} /> {t.investorLine}</div>
-              <div><ShieldCheck size={20} /> {t.homeownerLine}</div>
+            <p className="lead">{t.heroText}</p>
+            <div className="proofs">
+              <span><CheckCircle size={18}/>{t.proof1}</span>
+              <span><CheckCircle size={18}/>{t.proof2}</span>
+              <span><CheckCircle size={18}/>{t.proof3}</span>
             </div>
-            <div className="hero-buttons">
-              <Button>{t.ctaEstimate} <ArrowRight size={18} /></Button>
-              <Button variant="outline">{t.ctaHow}</Button>
+            <div className="actions">
+              <Button>{t.primary} <ArrowRight size={18}/></Button>
+              <Button variant="secondary">{t.secondary}</Button>
             </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6 }}>
-            <Card className="snapshot-card">
-              <div className="snapshot-head">
-                <h3>{t.snapshot}</h3>
-                <span>{t.active}</span>
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.55 }}>
+            <div className="visualBoard">
+              <div className="photoCard photoBefore">
+                <span>{t.before}</span>
               </div>
-              <div className="metric big">
-                <small>{t.estimatedRenovation}</small>
-                <strong>$60,000</strong>
+              <div className="photoCard photoAfter">
+                <span>{t.after}</span>
               </div>
-              <div className="metrics-grid">
-                <div className="metric"><small>{t.platformRevenue}</small><strong>$10.3K</strong></div>
-                <div className="metric"><small>{t.targetProfit}</small><strong>~$8K</strong></div>
-              </div>
-              <div className="progress"><div /></div>
-              <p>{t.snapshotNote}</p>
-            </Card>
+              <Card className="metricPanel">
+                <div><small>{t.heroMetric1}</small><strong>$60,000</strong></div>
+                <div><small>{t.heroMetric2}</small><strong>$10.3K</strong></div>
+                <div><small>{t.heroMetric3}</small><strong>~$8K</strong></div>
+              </Card>
+            </div>
           </motion.div>
         </div>
       </section>
 
-      <section className="section">
-        <div className="container">
-          <div className="section-head">
-            <h2>{t.whoTitle}</h2>
-            <p>{t.whoText}</p>
-          </div>
-          <div className="three-grid">
-            <Card><Building2 className="accent" size={34} /><h3>{t.investors}</h3><p>{t.investorsText}</p></Card>
-            <Card><Home className="accent" size={34} /><h3>{t.homeowners}</h3><p>{t.homeownersText}</p></Card>
-            <Card className="dark-card"><Camera size={34} /><h3>{t.visualTitle}</h3><p>{t.visualText}</p></Card>
-          </div>
-        </div>
-      </section>
-
-      <section id="how" className="section">
-        <div className="container">
-          <div className="section-head">
-            <h2>{t.howTitle}</h2>
-            <p>{t.howText}</p>
-          </div>
-          <div className="steps-grid">
-            {steps.map((step, index) => {
-              const Icon = step.icon;
-              return (
-                <Card key={step.title}>
-                  <div className="step-icon"><Icon size={22} /></div>
-                  <div className="step-number">Step {index + 1}</div>
-                  <h3>{step.title}</h3>
-                  <p>{step.text}</p>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section id="estimate" className="section white">
-        <div className="container two-grid">
+      <section id="opportunity" className="section">
+        <div className="container twoCol">
           <div>
-            <h2>{t.estimateTitle}</h2>
-            <p>{t.estimateText}</p>
-            <div className="benefits">
-              {[t.benefit1, t.benefit2, t.benefit3, t.benefit4].map((item) => (
-                <div key={item}><CheckCircle size={20} /> <span>{item}</span></div>
-              ))}
-            </div>
+            <div className="eyebrow">Market problem</div>
+            <h2>{t.opportunityTitle}</h2>
+            <p>{t.opportunityText}</p>
           </div>
-
-          <Card className="form-card">
-            <input placeholder={t.fullName} />
-            <input placeholder={t.contact} />
-            <input placeholder={t.address} />
-            <div className="project-types">
-              {projectTypes.map((type) => (
-                <button key={type} onClick={() => setProjectType(type)} className={projectType === type ? "selected" : ""}>
-                  {type}
-                </button>
-              ))}
-            </div>
-            <label className="investor-check">
-              <input type="checkbox" checked={isInvestor} onChange={() => setIsInvestor(!isInvestor)} />
-              {t.investorToggle}
-            </label>
-            <textarea placeholder={t.describe} />
-            <div className="upload"><Upload /> {t.upload}</div>
-            <Button className="full">{t.submit}</Button>
-          </Card>
-        </div>
-      </section>
-
-      <section className="section white">
-        <div className="container">
-          <div className="section-head">
-            <h2>{t.leadTitle}</h2>
-            <p>{lang === "en" ? "The site captures both audiences, while the business prioritizes higher-value opportunities." : "Сайт принимает обе аудитории, а бизнес приоритизирует более ценные заявки."}</p>
-          </div>
-          <div className="three-grid">
-            <Card><h3>1. Input</h3><p>{t.lead1}</p></Card>
-            <Card><h3>2. Segmentation</h3><p>{t.lead2}</p></Card>
-            <Card><h3>3. Priority</h3><p>{t.lead3}</p></Card>
-          </div>
-        </div>
-      </section>
-
-      <section id="dashboard" className="section">
-        <div className="container">
-          <div className="section-head row">
-            <div>
-              <h2>{t.dashboardTitle}</h2>
-              <p>{t.dashboardText}</p>
-            </div>
-            <Button variant="outline">{t.sample}</Button>
-          </div>
-          <Card className="dashboard-card">
-            <div className="dashboard-metrics">
-              <div><small>{t.status}</small><strong>{t.estimateReview}</strong></div>
-              <div><small>{t.budget}</small><strong>$60,000</strong></div>
-              <div><small>{t.timeline}</small><strong>6–8 weeks</strong></div>
-              <div><small>{t.contractors}</small><strong>{t.matched}</strong></div>
-            </div>
-            <div className="milestones">
-              {steps.map((stage, index) => (
-                <div key={stage.title}>
-                  <span className={index < 3 ? "done" : ""} />
-                  <strong>{stage.title}</strong>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      <section id="contractors" className="section white">
-        <div className="container">
-          <div className="section-head">
-            <h2>{t.verifiedTitle}</h2>
-            <p>{t.verifiedText}</p>
-          </div>
-          <div className="three-grid">
-            {contractors.map((contractor) => (
-              <Card key={contractor.name}>
-                <div className="step-icon"><Users size={24} /></div>
-                <h3>{contractor.name}</h3>
-                <p>{contractor.tag}</p>
-                <div className="rating"><Star size={18} /> <strong>{contractor.rating}</strong> verified rating</div>
+          <div className="problemList">
+            {problemItems.map((item) => (
+              <Card key={item} className="problemItem">
+                <Target size={22}/>
+                <span>{item}</span>
               </Card>
             ))}
           </div>
         </div>
       </section>
 
+      <section className="section white">
+        <div className="container">
+          <div className="sectionHead">
+            <div className="eyebrow">Solution</div>
+            <h2>{t.solutionTitle}</h2>
+          </div>
+          <div className="fourGrid">
+            {solutionItems.map(([Icon, text], index) => (
+              <Card key={text}>
+                <div className="icon"><Icon size={24}/></div>
+                <strong>{`0${index + 1}`}</strong>
+                <p>{text}</p>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="model" className="section">
+        <div className="container twoCol">
+          <div>
+            <div className="eyebrow">Business model</div>
+            <h2>{t.modelTitle}</h2>
+            <p>{t.modelText}</p>
+          </div>
+          <Card className="revenueCard">
+            {revenues.map(([Icon, text]) => (
+              <div key={text}>
+                <Icon size={24}/>
+                <span>{text}</span>
+              </div>
+            ))}
+          </Card>
+        </div>
+      </section>
+
+      <section className="section dark">
+        <div className="container twoCol">
+          <div>
+            <div className="eyebrow light">Partner logic</div>
+            <h2>{t.partnerTitle}</h2>
+            <p>{t.partnerText}</p>
+          </div>
+          <div className="partnerPoints">
+            {[t.partnerPoint1, t.partnerPoint2, t.partnerPoint3].map((item) => (
+              <div key={item}><CheckCircle size={20}/><span>{item}</span></div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="example" className="section white">
+        <div className="container twoCol">
+          <div>
+            <div className="eyebrow">{t.exampleTitle}</div>
+            <h2>{t.exampleText}</h2>
+            <div className="stats">
+              <div><small>{t.estRenovation}</small><strong>$60,000</strong></div>
+              <div><small>{t.timeline}</small><strong>6–8 weeks</strong></div>
+              <div><small>{t.revenue}</small><strong>$10.3K</strong></div>
+            </div>
+          </div>
+          <Card className="beforeAfter">
+            <div className="ba before"><span>{t.before}</span></div>
+            <div className="ba after"><span>{t.after}</span></div>
+          </Card>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container twoCol">
+          <div>
+            <div className="eyebrow">{t.executionBadge}</div>
+            <h2>{t.executionTitle}</h2>
+            <p>{t.executionText}</p>
+            <ul className="bulletList">
+              <li>{t.executionPoint1}</li>
+              <li>{t.executionPoint2}</li>
+              <li>{t.executionPoint3}</li>
+            </ul>
+          </div>
+          <div className="imageCard">
+            <img src="/images/contractor.jpg" alt="Contractor working inside a home" />
+          </div>
+        </div>
+      </section>
+
+      <section className="section white">
+        <div className="container twoCol">
+          <div className="imageCard">
+            <img src="/images/after-2.jpg" alt="Finished renovated interior" />
+          </div>
+          <div>
+            <div className="eyebrow">{t.resultBadge}</div>
+            <h2>{t.resultTitle}</h2>
+            <p>{t.resultText}</p>
+            <ul className="bulletList">
+              <li>{t.resultPoint1}</li>
+              <li>{t.resultPoint2}</li>
+              <li>{t.resultPoint3}</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       <section className="section">
         <div className="container">
-          <Card className="cta-card">
-            <div>
-              <h2>{t.readyTitle}</h2>
-              <p>{t.readyText}</p>
-              <Button>{t.startEstimate}</Button>
-            </div>
-            <div className="cta-points">
-              <div><MessageCircle /><strong>{t.manual}</strong><span>{t.manualText}</span></div>
-              <div><ShieldCheck /><strong>{t.trust}</strong><span>{t.trustText}</span></div>
-            </div>
+          <div className="sectionHead">
+            <div className="eyebrow">Workflow</div>
+            <h2>{t.stepsTitle}</h2>
+          </div>
+          <div className="steps">
+            {steps.map((step, index) => (
+              <Card key={step} className="step">
+                <span>{index + 1}</span>
+                <strong>{step}</strong>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="roadmap" className="section white">
+        <div className="container">
+          <div className="sectionHead">
+            <div className="eyebrow">Roadmap</div>
+            <h2>{t.roadmapTitle}</h2>
+            <p>{t.roadmapText}</p>
+          </div>
+          <div className="threeGrid">
+            <Card><strong>{t.phase1}</strong><p>{t.phase1Text}</p></Card>
+            <Card><strong>{t.phase2}</strong><p>{t.phase2Text}</p></Card>
+            <Card><strong>{t.phase3}</strong><p>{t.phase3Text}</p></Card>
+          </div>
+        </div>
+      </section>
+
+      <section className="section ctaSection">
+        <div className="container ctaGrid">
+          <div>
+            <h2>{t.ctaTitle}</h2>
+            <p>{t.ctaText}</p>
+            <Button>{t.ctaButton}</Button>
+          </div>
+          <Card className="formCard">
+            <input placeholder={t.formName}/>
+            <input placeholder={t.formContact}/>
+            <textarea placeholder={t.formMessage}/>
+            <div className="upload"><Upload size={18}/> Upload project photos later</div>
+            <Button>{t.formSubmit}</Button>
           </Card>
         </div>
       </section>

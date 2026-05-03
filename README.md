@@ -1,17 +1,8 @@
-# Renovation Platform MVP
+# Renovation Platform — Partner Version
 
-Ready-to-deploy React + Vite website.
+React + Vite partner demo website.
 
-## Local preview
-
-```bash
-npm install
-npm run dev
-```
-
-## Vercel settings
-
-- Framework Preset: Vite
+## Deploy
+- Framework: Vite
 - Build Command: npm run build
 - Output Directory: dist
-- Install Command: npm install
