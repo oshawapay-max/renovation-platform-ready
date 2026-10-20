@@ -70,29 +70,34 @@ function needsVideoOptimization(file){
   const mime=allowedMime(file);
   return file.size>MAX_BYTES && typeof mime==='string' && mime.startsWith('video/');
 }
+/* RID_VIDEO_CANVAS_ENCODER_V2: customer-device transcoding.
+   The original HTMLMediaElement.captureStream() path could return no video
+   tracks for specific Chromium/Edge codecs. Canvas generates an independent
+   video track; WebAudio carries the source audio into the recorded result. */
 function videoCompressionSupported(){
   return typeof MediaRecorder!=='undefined' &&
-    typeof HTMLMediaElement!=='undefined' &&
-    typeof HTMLMediaElement.prototype.captureStream==='function' &&
+    typeof HTMLCanvasElement!=='undefined' &&
+    typeof HTMLCanvasElement.prototype.captureStream==='function' &&
+    typeof AudioContext!=='undefined' &&
     ['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].some(type=>MediaRecorder.isTypeSupported(type));
 }
 async function runVideoCompressionPass(file,report,targetBytes,qualityFactor){
-  if(!videoCompressionSupported())throw Error('Автоматическое сжатие видео недоступно в этом браузере. Используйте актуальную версию Edge или Chrome.');
+  if(!videoCompressionSupported())throw Error('Этот браузер не поддерживает безопасную обработку видео. Откройте Kitchen Pilot в актуальном Edge или Chrome.');
   const mimeType=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(type=>MediaRecorder.isTypeSupported(type));
   const url=URL.createObjectURL(file);
   const video=document.createElement('video');
-  video.muted=true;
-  video.playsInline=true;
-  video.preload='auto';
-  video.style.cssText='position:fixed;width:1px;height:1px;left:-99999px;top:0;opacity:0;pointer-events:none';
+  video.muted=true; video.playsInline=true; video.preload='auto';
+  video.style.cssText='position:fixed;width:2px;height:2px;left:-99999px;top:0;opacity:0;pointer-events:none';
   document.body.appendChild(video);
-  let recorder=null,stream=null,timer=null,watchdog=null;
+  let recorder=null,stream=null,audioCtx=null,timer=null,watchdog=null,drawTimer=null;
   const cleanup=()=>{
     if(timer!==null)clearInterval(timer);
     if(watchdog!==null)clearTimeout(watchdog);
-    try{if(recorder&&recorder.state!=='inactive')recorder.stop();}catch{}
-    try{video.pause();video.removeAttribute('src');video.load();video.remove();}catch{}
+    if(drawTimer!==null)clearInterval(drawTimer);
+    try{if(recorder&&recorder.state!=='inactive')recorder.stop()}catch{}
+    try{video.pause();video.removeAttribute('src');video.load();video.remove()}catch{}
     if(stream)for(const track of stream.getTracks())try{track.stop()}catch{}
+    if(audioCtx)try{audioCtx.close()}catch{}
     URL.revokeObjectURL(url);
   };
   try{
@@ -100,34 +105,60 @@ async function runVideoCompressionPass(file,report,targetBytes,qualityFactor){
     await new Promise((resolve,reject)=>{
       if(video.readyState>=1)return resolve();
       video.addEventListener('loadedmetadata',resolve,{once:true});
-      video.addEventListener('error',()=>reject(Error('Браузер не смог открыть исходное видео для сжатия.')),{once:true});
+      video.addEventListener('error',()=>reject(Error('Этот видеофайл не удалось декодировать в браузере. Оригинал не изменён.')),{once:true});
       video.load();
     });
     const duration=video.duration;
-    if(!Number.isFinite(duration)||duration<=0)throw Error('Не удалось определить продолжительность видео.');
+    if(!Number.isFinite(duration)||duration<=0||duration>3600)throw Error('Не удалось прочитать длительность видео (допустима запись до 60 минут).');
+    if(!video.videoWidth||!video.videoHeight)throw Error('Браузер не смог декодировать кадры исходного видео.');
+    const ratio=Math.min(1,1280/video.videoWidth,720/video.videoHeight);
+    const width=Math.max(2,Math.round(video.videoWidth*ratio/2)*2);
+    const height=Math.max(2,Math.round(video.videoHeight*ratio/2)*2);
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const context=canvas.getContext('2d',{alpha:false});
+    if(!context)throw Error('Браузер не смог создать видеокадры для сжатия.');
+    context.fillStyle='#000';context.fillRect(0,0,width,height);
+    stream=canvas.captureStream(20);
+    if(stream.getVideoTracks().length!==1)throw Error('Не удалось создать видеодорожку из кадров.');
+    try{
+      audioCtx=new AudioContext();
+      const source=audioCtx.createMediaElementSource(video);
+      const audioOutput=audioCtx.createMediaStreamDestination();
+      source.connect(audioOutput);
+      await audioCtx.resume();
+      if(audioCtx.state!=='running'||!audioOutput.stream.getAudioTracks().length)throw Error('Audio track unavailable');
+      for(const track of audioOutput.stream.getAudioTracks())stream.addTrack(track);
+    }catch(e){
+      throw Error('Не удалось подготовить звуковую дорожку без потерь. Видео не отправлено; исходный файл сохранён.');
+    }
     const maxTotalBitrate=(targetBytes*8/duration)*qualityFactor;
     const inputBitrate=(file.size*8/duration)*0.82;
     const videoBps=Math.max(180000,Math.floor(Math.min(maxTotalBitrate,inputBitrate)-96000));
-    stream=video.captureStream();
-    if(!stream.getVideoTracks().length)throw Error('Браузер не может захватить видеодорожку.');
     const chunks=[];
     recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:videoBps,audioBitsPerSecond:96000});
-    const finished=new Promise((resolve,reject)=>{
+    const completed=new Promise((resolve,reject)=>{
       recorder.addEventListener('dataavailable',event=>{if(event.data&&event.data.size>0)chunks.push(event.data)});
-      recorder.addEventListener('error',event=>reject(Error(event?.error?.message||'Ошибка видеокодировщика')),{once:true});
+      recorder.addEventListener('error',event=>reject(Error(event?.error?.message||'Ошибка кодирования видео')),{once:true});
       recorder.addEventListener('stop',resolve,{once:true});
-      video.addEventListener('error',()=>reject(Error('Ошибка декодирования исходного видео')),{once:true});
-      video.addEventListener('ended',()=>{if(recorder?.state==='recording')recorder.stop();},{once:true});
+      video.addEventListener('error',()=>reject(Error('Ошибка воспроизведения исходного видео')),{once:true});
+      video.addEventListener('ended',()=>{if(recorder?.state==='recording')recorder.stop()},{once:true});
     });
+    drawTimer=setInterval(()=>{
+      if(video.readyState>=2&&!video.paused&&!video.ended){
+        try{context.drawImage(video,0,0,width,height)}catch{}
+      }
+    },50);
     recorder.start(1000);
     timer=setInterval(()=>report(Math.max(0,Math.min(99,Math.floor(video.currentTime/duration*100)))),600);
     const timeout=new Promise((_,reject)=>{
-      watchdog=setTimeout(()=>reject(Error('Сжатие остановилось или превысило допустимое время.')),(duration*2+30)*1000);
+      watchdog=setTimeout(()=>reject(Error('Сжатие заняло слишком много времени. Оригинал сохранён, можно повторить загрузку.')),(duration*2+45)*1000);
     });
     await video.play();
-    await Promise.race([finished,timeout]);
+    // Sound flows only to the in-memory recording, not to the computer speakers.
+    video.muted=false;
+    await Promise.race([completed,timeout]);
     const blob=new Blob(chunks,{type:'video/webm'});
-    if(blob.size===0||blob.size>=file.size)throw Error('Видео не удалось уменьшить. Исходный файл остался на вашем компьютере.');
+    if(blob.size===0||blob.size>=file.size)throw Error('Сжатие не уменьшило размер видео. Исходный файл сохранён на компьютере.');
     report(100);
     return new File([blob],(file.name||'video').replace(/\.[^.]+$/,'')+'.rid-optimized.webm',{type:'video/webm',lastModified:Date.now()});
   }finally{cleanup();}
