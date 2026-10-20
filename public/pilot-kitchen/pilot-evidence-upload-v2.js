@@ -20,7 +20,7 @@ const info=document.createElement("div");
 info.id="ridUploadHelp";
 info.className="muted";
 info.style.margin="9px 0";
-info.textContent="Можно выбрать сразу несколько фото или видео (Shift или Ctrl в окне выбора). Поддерживаются JPG, PNG, WebP, HEIC, MP4, MOV, WebM и PDF. Размер каждого файла — не более 50 МБ. Файлы сохраняются только в выбранном проекте.";
+info.textContent="Можно выбрать сразу несколько фото или видео (Shift или Ctrl в окне выбора). MP4, MOV и WebM больше 50 МБ автоматически сжимаются в браузере, при этом исходный файл на компьютере сохраняется. Подготовка видео занимает время, примерно сопоставимое с длительностью ролика. После обработки файлы загружаются только в выбранный проект.";
 fileInput.insertAdjacentElement("afterend",info);
 const queue=document.createElement("div");queue.id="ridUploadQueue";queue.setAttribute("aria-live","polite");fileInput.insertAdjacentElement("afterend",queue);
 const registry=document.createElement("div");registry.id="ridProjectEvidence";registry.setAttribute("aria-live","polite");
@@ -58,9 +58,100 @@ function fileIssue(file){
  const mime=allowedMime(file);
  if(!mime)return "Неподдерживаемый тип файла: "+(file.name||"без названия")+". Допустимы JPG, PNG, WebP, HEIC, MP4, MOV, WebM, PDF.";
  if(file.size===0)return "Файл пустой (0 байт): "+file.name+".";
- if(file.size>MAX_BYTES)return "Файл слишком большой: "+file.name+" ("+humanSize(file.size)+"). Максимум — 50 МБ.";
+ if(file.size>MAX_BYTES&&!needsVideoOptimization(file))return "Файл слишком большой: "+file.name+" ("+humanSize(file.size)+"). Максимум — 50 МБ.";
  return null;
 }
+
+/* RID_AUTO_VIDEO_COMPRESSION_v1
+   Runs entirely on the user's device. Never uploads the original oversized video.
+   Audio/video transcoding uses HTMLMediaElement.captureStream() + MediaRecorder.
+   Only authenticated, registered result is considered saved to RID. */
+function needsVideoOptimization(file){
+  const mime=allowedMime(file);
+  return file.size>MAX_BYTES && typeof mime==='string' && mime.startsWith('video/');
+}
+function videoCompressionSupported(){
+  return typeof MediaRecorder!=='undefined' &&
+    typeof HTMLMediaElement!=='undefined' &&
+    typeof HTMLMediaElement.prototype.captureStream==='function' &&
+    ['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].some(type=>MediaRecorder.isTypeSupported(type));
+}
+async function runVideoCompressionPass(file,report,targetBytes,qualityFactor){
+  if(!videoCompressionSupported())throw Error('Автоматическое сжатие видео недоступно в этом браузере. Используйте актуальную версию Edge или Chrome.');
+  const mimeType=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(type=>MediaRecorder.isTypeSupported(type));
+  const url=URL.createObjectURL(file);
+  const video=document.createElement('video');
+  video.muted=true;
+  video.playsInline=true;
+  video.preload='auto';
+  video.style.cssText='position:fixed;width:1px;height:1px;left:-99999px;top:0;opacity:0;pointer-events:none';
+  document.body.appendChild(video);
+  let recorder=null,stream=null,timer=null,watchdog=null;
+  const cleanup=()=>{
+    if(timer!==null)clearInterval(timer);
+    if(watchdog!==null)clearTimeout(watchdog);
+    try{if(recorder&&recorder.state!=='inactive')recorder.stop();}catch{}
+    try{video.pause();video.removeAttribute('src');video.load();video.remove();}catch{}
+    if(stream)for(const track of stream.getTracks())try{track.stop()}catch{}
+    URL.revokeObjectURL(url);
+  };
+  try{
+    video.src=url;
+    await new Promise((resolve,reject)=>{
+      if(video.readyState>=1)return resolve();
+      video.addEventListener('loadedmetadata',resolve,{once:true});
+      video.addEventListener('error',()=>reject(Error('Браузер не смог открыть исходное видео для сжатия.')),{once:true});
+      video.load();
+    });
+    const duration=video.duration;
+    if(!Number.isFinite(duration)||duration<=0)throw Error('Не удалось определить продолжительность видео.');
+    const maxTotalBitrate=(targetBytes*8/duration)*qualityFactor;
+    const inputBitrate=(file.size*8/duration)*0.82;
+    const videoBps=Math.max(180000,Math.floor(Math.min(maxTotalBitrate,inputBitrate)-96000));
+    stream=video.captureStream();
+    if(!stream.getVideoTracks().length)throw Error('Браузер не может захватить видеодорожку.');
+    const chunks=[];
+    recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:videoBps,audioBitsPerSecond:96000});
+    const finished=new Promise((resolve,reject)=>{
+      recorder.addEventListener('dataavailable',event=>{if(event.data&&event.data.size>0)chunks.push(event.data)});
+      recorder.addEventListener('error',event=>reject(Error(event?.error?.message||'Ошибка видеокодировщика')),{once:true});
+      recorder.addEventListener('stop',resolve,{once:true});
+      video.addEventListener('error',()=>reject(Error('Ошибка декодирования исходного видео')),{once:true});
+      video.addEventListener('ended',()=>{if(recorder?.state==='recording')recorder.stop();},{once:true});
+    });
+    recorder.start(1000);
+    timer=setInterval(()=>report(Math.max(0,Math.min(99,Math.floor(video.currentTime/duration*100)))),600);
+    const timeout=new Promise((_,reject)=>{
+      watchdog=setTimeout(()=>reject(Error('Сжатие остановилось или превысило допустимое время.')),(duration*2+30)*1000);
+    });
+    await video.play();
+    await Promise.race([finished,timeout]);
+    const blob=new Blob(chunks,{type:'video/webm'});
+    if(blob.size===0||blob.size>=file.size)throw Error('Видео не удалось уменьшить. Исходный файл остался на вашем компьютере.');
+    report(100);
+    return new File([blob],(file.name||'video').replace(/\.[^.]+$/,'')+'.rid-optimized.webm',{type:'video/webm',lastModified:Date.now()});
+  }finally{cleanup();}
+}
+async function optimizeVideoForUpload(file,index){
+  if(!needsVideoOptimization(file))return file;
+  const originalMb=humanSize(file.size);
+  setFileState(index,'Сжимаем видео '+originalMb+' прямо в браузере. Исходный файл не изменится. Не закрывайте вкладку.');
+  const targetBytes=43*1024*1024;
+  const qualityFactors=[0.84,0.63];
+  let converted=null;
+  for(let pass=0;pass<qualityFactors.length;pass++){
+    if(pass) setFileState(index,'Первая попытка оказалась слишком большой. Подбираем более сильное сжатие...');
+    const prefix=pass?'Повторное сжатие':'Сжатие видео';
+    converted=await runVideoCompressionPass(file,percent=>{
+      setFileState(index,prefix+': '+percent+'%. Видео обрабатывается на вашем компьютере, звук сохраняется.');
+    },targetBytes,qualityFactors[pass]);
+    if(converted.size<=MAX_BYTES)break;
+  }
+  if(!converted||converted.size>MAX_BYTES)throw Error('Не удалось уменьшить видео до 50 МБ без дополнительной обработки. Оригинал сохранён на компьютере.');
+  setFileState(index,'Видео подготовлено: '+originalMb+' → '+humanSize(converted.size)+'. Передаём в RID...');
+  return converted;
+}
+
 function safeName(name){
  const base=String(name||"file").replace(/[^A-Za-z0-9._-]+/g,"_").slice(-100);
  return base||"file";
@@ -95,6 +186,7 @@ function updateQueue(){
    const state=document.createElement("div");state.className="muted";state.id="ridUploadState"+i;state.style.marginTop="4px";
    const issue=fileIssue(file);
    if(issue){state.textContent="Пропущен: "+issue;state.style.color="#9a4400";line.style.borderColor="#c77";line.style.background="#fff7f6";cat.disabled=true;}
+   else if(needsVideoOptimization(file))state.textContent="Будет автоматически сжато до 50 МБ при загрузке (на этом компьютере). Исходное видео останется без изменений.";
    else state.textContent="Ожидает загрузки";
    line.append(name,cat,state);queue.appendChild(line);
  }
@@ -214,17 +306,23 @@ async function uploadBatch(){
  if(!id)return;
  try{
    await ensureReady(projectId);
-   for(let i=0;i<files.length;i++){
+   const order=files.map((file,i)=>({file,i})).sort((a,b)=>Number(needsVideoOptimization(a.file))-Number(needsVideoOptimization(b.file)));
+   for(const {file:originalFile,i} of order){
      if(projectId!==activeProjectId){failed+=files.length-i;setStatus("Проект переключился во время загрузки. Остановлено.","error");break;}
-     const f=files[i],key=fileKey(f,i);
-     if(fileIssue(f))continue; // Per-file validation must not block other selected files.
+     const key=fileKey(originalFile,i);
+     if(fileIssue(originalFile))continue; // Per-file validation must not block other selected files.
      if(uploadedThisSelection.has(key)){completed++;continue;}
-     setFileState(i,"Передача файла "+(i+1)+" из "+files.length+"…");
+     setFileState(i,"Подготавливаем файл "+(i+1)+" из "+files.length+"…");
      try{
+       const f=await optimizeVideoForUpload(originalFile,i);
+       if(!allowedMime(f)||f.size===0||f.size>MAX_BYTES)throw Error("Подготовленный файл превышает лимит 50 МБ или имеет неподдерживаемый формат.");
        const originalName=f.name;
        const objectName=id+"/"+projectId+"/"+Date.now()+"-"+crypto.randomUUID()+"-"+safeName(originalName);
        const mime=allowedMime(f);
-       const item={objectName,category:selectedCategory.get(key)||existingCategory.value||"ROOM_OVERVIEW",provenance:document.getElementById("evidenceProvenance")?.value||"CUSTOMER_REPORTED",caption:((document.getElementById("evidenceCaption")?.value||"").trim()||originalName).slice(0,500),filename:originalName};
+       const changed=needsVideoOptimization(originalFile);
+       const basicCaption=((document.getElementById("evidenceCaption")?.value||"").trim()||originalFile.name);
+       const caption=(changed?basicCaption+" [Видео оптимизировано из "+originalFile.name+" ("+humanSize(originalFile.size)+") в "+originalName+" ("+humanSize(f.size)+"). Исходный файл у заказчика.]":basicCaption).slice(0,500);
+       const item={objectName,category:selectedCategory.get(key)||existingCategory.value||"ROOM_OVERVIEW",provenance:document.getElementById("evidenceProvenance")?.value||"CUSTOMER_REPORTED",caption,filename:originalFile.name};
        const encoded=objectName.split("/").map(encodeURIComponent).join("/");
        const up=await fetch(SUPABASE_ORIGIN+"/storage/v1/object/rid-evidence/"+encoded,{
          method:"POST",
