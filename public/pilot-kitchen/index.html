@@ -426,6 +426,7 @@ hr{border:0;border-top:1px solid #e1e1de;margin:16px 0}.field{border-top:1px sol
 </div>
 </div>
 </main>
+<script src="/pilot-kitchen/pilot-draft-autosave-v1.js?v=1"></script>
 <script>
 const SUPABASE_ORIGIN = 'https://lauklxfbtujkqepnktrc.supabase.co';
 const UI_BASE = SUPABASE_ORIGIN + '/functions/v1/rid-kitchen-pilot-ui';
@@ -492,8 +493,8 @@ async function login(){
   auth=j; sessionStorage.setItem('ridPilotAccess',j.access_token); if(j.refresh_token)sessionStorage.setItem('ridPilotRefresh',j.refresh_token);
   $('password').value=''; await enter();
 }
-function logout(){ auth=null;sessionStorage.removeItem('ridPilotAccess');sessionStorage.removeItem('ridPilotRefresh');$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');say('Signed out or session expired.');}
-async function enter(){ $('loginCard').classList.add('hidden');$('app').classList.remove('hidden');await refreshEntry();say('Authenticated. RID Pilot Workspace is active.','good');}
+function logout(){ window.RIDKitchenDraft?.onLogout(); auth=null;sessionStorage.removeItem('ridPilotAccess');sessionStorage.removeItem('ridPilotRefresh');$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');say('Signed out or session expired.');}
+async function enter(){ $('loginCard').classList.add('hidden');$('app').classList.remove('hidden');await refreshEntry();await window.RIDKitchenDraft?.onEntryReady();say('Authenticated. RID Pilot Workspace is active.','good');}
 
 async function refreshEntry(){
   const j=await api('/project-entry',{method:'GET'}); entry=j.data; renderEntry(); diag(j);
@@ -550,10 +551,12 @@ async function acceptEnrollmentInvite(kind,projectId,inviteId){
 }
 async function selectProject(id){
   if(/(^|[-_])(dev|test|stress|e2e|fixture|synthetic)([-_]|$)/i.test(String(id||'')))throw new Error('CLEAN_PILOT_PROJECT_REQUIRED');
+  window.RIDKitchenDraft?.beforeProjectSwitch();
   activeProjectId=id; workspace=null; roleAssignmentId=null; lastIntentPackageId=null;
+  prelimSchema=null; prelimSelectedFollowupIds=new Set(); $('prelimFields').innerHTML=''; $('prelimEvidenceGoals').innerHTML=''; $('prelimMediaFollowups').innerHTML=''; $('prelimResult').innerHTML='';
   const p=(entry?.projects||[]).find(x=>x.projectId===id); activeDomain='KITCHEN';
   renderDomainIntents();
-  $('activeProject').textContent=id+' · '+activeDomain; enableProjectButtons(true); await loadWorkspace();
+  $('activeProject').textContent=id+' · '+activeDomain; enableProjectButtons(true); await loadWorkspace(); await window.RIDKitchenDraft?.onProjectSelected();
 }
 function enableProjectButtons(on){
   ['loadWorkspace','loadJourney','initPilot','setRole','selectIntent','loadPrelim','loadC03','inviteC03','loadRealAssessment','loadGovernedLifecycle','loadT45','createDesignInvite','createProfessionalInvite','viewEstimate','issueEstimate','viewReview','completeScreening','recordDecision','recordShadowPrelimDecision','startShadowAssessment','startFunctionalPlanning','createDesignHandoff','refreshDesignDeps','createWorkPackages','startShadowExecution','refreshExecutionDeps','recordHiddenCondition','createShadowCR','decideShadowCR','applyShadowCR','recordShadowCompletion','recordShadowInspection','recordShadowAcceptance','issueShadowRFU'].forEach(id=>$(id).disabled=!on);
@@ -977,6 +980,7 @@ async function loadPilot(show=true){
   renderFunctionalPlanning(p);
   renderShadowExecution(p);
   renderPilotAssistant(p);
+  window.RIDKitchenDraft?.onPilotLoaded(p);
   if(show)diag(j); return p;
 }
 async function intentCommand(command,payload){
@@ -998,6 +1002,7 @@ function selectedIntentPayload(includeReason=false){
   return payload;
 }
 async function loadPrelim(){
+  if(document.querySelector('#prelimFields [data-fid]'))window.RIDKitchenDraft?.saveNow(false);
   const j=await api('/projects/'+activeProjectId+'/preliminary-input',{
     method:'GET',headers:{'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()}
   });
@@ -1059,6 +1064,7 @@ function renderPrelim(savedAnswers={}){
   renderMediaFollowupCandidates();
   $('previewPrelim').disabled=false;
   $('submitPrelim').disabled=(prelimSchema?.contentBlockers||[]).length>0;
+  window.RIDKitchenDraft?.onPrelimRendered(savedAnswers,prelimSchema);
 }
 function renderMediaFollowupCandidates(){
   const box=$('prelimMediaFollowups');if(!box)return;
@@ -1078,6 +1084,7 @@ function collectPrelim(){
   return answers;
 }
 async function prelim(postCommand){
+  window.RIDKitchenDraft?.saveNow(false);
   const path='/projects/'+activeProjectId+'/preliminary-input'+(postCommand?'/commands':'/preview');
   const h={'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()};
   if(postCommand){h['if-match']=String(workspace.revision);h['idempotency-key']=idem('prelim');}
@@ -1102,7 +1109,7 @@ async function prelim(postCommand){
     contentBlockers:j.data?.contentBlockers??[]
   };
   $('prelimResult').innerHTML='<pre>'+escapeHtml(JSON.stringify(summary,null,2))+'</pre>';
-  if(postCommand){await loadWorkspace();await loadPrelim()} return j;
+  if(postCommand){window.RIDKitchenDraft?.onSubmitted();await loadWorkspace();await loadPrelim()} return j;
 }
 async function estimate(issue=false){
   const h={'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()};
