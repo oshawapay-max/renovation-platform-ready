@@ -54,6 +54,13 @@ function allowedMime(file){
  const ext=(file.name.split(".").pop()||"").toLowerCase();
  return MIME_BY_EXT[ext]||null;
 }
+function fileIssue(file){
+ const mime=allowedMime(file);
+ if(!mime)return "Неподдерживаемый тип файла: "+(file.name||"без названия")+". Допустимы JPG, PNG, WebP, HEIC, MP4, MOV, WebM, PDF.";
+ if(file.size===0)return "Файл пустой (0 байт): "+file.name+".";
+ if(file.size>MAX_BYTES)return "Файл слишком большой: "+file.name+" ("+humanSize(file.size)+"). Максимум — 50 МБ.";
+ return null;
+}
 function safeName(name){
  const base=String(name||"file").replace(/[^A-Za-z0-9._-]+/g,"_").slice(-100);
  return base||"file";
@@ -86,12 +93,14 @@ function updateQueue(){
    selectedCategory.set(key,cat.value);
    cat.addEventListener("change",()=>selectedCategory.set(key,cat.value));
    const state=document.createElement("div");state.className="muted";state.id="ridUploadState"+i;state.style.marginTop="4px";
-   if(!allowedMime(file))state.textContent="Формат не поддерживается.";
-   else if(file.size>MAX_BYTES)state.textContent="Файл слишком большой. Максимум 50 МБ.";
+   const issue=fileIssue(file);
+   if(issue){state.textContent="Пропущен: "+issue;state.style.color="#9a4400";line.style.borderColor="#c77";line.style.background="#fff7f6";cat.disabled=true;}
    else state.textContent="Ожидает загрузки";
    line.append(name,cat,state);queue.appendChild(line);
  }
- setStatus("Выбрано файлов: "+chosen.length+". Нажмите «Загрузить выбранные файлы в проект».");
+ const rejected=chosen.filter(fileIssue);
+ const allowed=chosen.length-rejected.length;
+ setStatus("Выбрано: "+chosen.length+". Можно загрузить: "+allowed+". Неподходящих файлов: "+rejected.length+"."+(rejected.length?" Они выделены красным и не помешают остальным.":"")+" Нажмите «Загрузить выбранные файлы в проект».",rejected.length?"error":"");
 }
 function setFileState(i,text,good=false){
  const el=document.getElementById("ridUploadState"+i);
@@ -191,17 +200,25 @@ async function uploadBatch(){
  if(!files.length){setStatus("Выберите фотографии, видео или документы, затем нажмите «Загрузить выбранные файлы».","error");return;}
  const projectId=activeProjectId;
  if(!projectId||!roleAssignmentId){setStatus("Сначала выберите действующий проект кухни в первом разделе.","error");return;}
- const invalid=files.filter(f=>!allowedMime(f)||f.size===0||f.size>MAX_BYTES);
- if(invalid.length){setStatus("Перед загрузкой уберите неподдерживаемые, пустые или слишком большие файлы (не более 50 МБ на файл).","error");return;}
+ const invalid=files.map((f,i)=>({file:f,index:i,reason:fileIssue(f)})).filter(x=>x.reason);
+ const validCount=files.length-invalid.length;
+ for(const x of invalid)setFileState(x.index,"Не загружен: "+x.reason);
+ if(!validCount){
+   setStatus("Ни один файл нельзя загрузить. Проверьте отмеченные красным названия и размеры: "+invalid.map(x=>(x.index+1)+". "+x.reason).join(" | ").slice(0,1100),"error");
+   return;
+ }
  inFlight=true;uploadBtn.disabled=true;
- let completed=0,failed=0;const id=await identity().catch(e=>{inFlight=false;uploadBtn.disabled=false;setStatus(friendlyError(e),"error");return null;});
+ let completed=0,failed=invalid.length;
+ setStatus("Начинаем загрузку "+validCount+" подходящих файлов. Пропускаем: "+invalid.length+".");
+ const id=await identity().catch(e=>{inFlight=false;uploadBtn.disabled=false;setStatus(friendlyError(e),"error");return null;});
  if(!id)return;
  try{
    await ensureReady(projectId);
    for(let i=0;i<files.length;i++){
      if(projectId!==activeProjectId){failed+=files.length-i;setStatus("Проект переключился во время загрузки. Остановлено.","error");break;}
      const f=files[i],key=fileKey(f,i);
-     if(uploadedThisSelection.has(key))continue;
+     if(fileIssue(f))continue; // Per-file validation must not block other selected files.
+     if(uploadedThisSelection.has(key)){completed++;continue;}
      setFileState(i,"Передача файла "+(i+1)+" из "+files.length+"…");
      try{
        const originalName=f.name;
@@ -228,8 +245,9 @@ async function uploadBatch(){
      }
    }
    await refreshRegistry();
-   if(failed===0){setStatus("Готово: "+files.length+" файл(ов) сохранены в проекте и доступны после повторного входа.","good");fileInput.value="";queue.replaceChildren();}
-   else setStatus("Сохранено файлов: "+completed+". Ошибок: "+failed+". Неуспешные файлы и возможные действия показаны выше и в списке проекта.","error");
+   if(failed===0){setStatus("Готово: "+completed+" файл(ов) сохранены в проекте и доступны после повторного входа.","good");fileInput.value="";queue.replaceChildren();}
+   else if(completed>0)setStatus("Сохранено в проекте: "+completed+" из "+files.length+". Не загружено: "+failed+". Проверьте отмеченные файлы и причины рядом с каждым названием.","error");
+   else setStatus("Не удалось сохранить ни одного файла. Причины показаны рядом с каждым названием. Сначала исправьте ошибку, затем повторите загрузку.","error");
  }catch(e){setStatus("Загрузка остановлена: "+friendlyError(e),"error");}
  finally{inFlight=false;uploadBtn.disabled=false;}
 }
