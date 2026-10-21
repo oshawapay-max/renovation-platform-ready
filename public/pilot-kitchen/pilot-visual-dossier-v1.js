@@ -21,7 +21,7 @@ const mk=(tag,text,css)=>{
  const e=document.createElement(tag);if(text!==undefined)e.textContent=String(text);
  if(css)e.style.cssText=css;return e;
 };
-const isProject=()=>state.projectId&&activeProjectId===state.projectId&&roleAssignmentId;
+const isProject=()=>state.projectId&&activeProjectId===state.projectId&&roleAssignmentId&&state.assignmentId===roleAssignmentId;
 const status=(str,bad=false)=>{
  const e=$("ridDossierStatus");if(e){e.textContent=str;e.style.color=bad?"#a32d2a":"#2b6842";}
 };
@@ -61,7 +61,7 @@ function makeUI(){
  const backup=mk("button","Скачать копию карты");backup.id="ridDossierBackup";backup.type="button";backup.className="secondary";backup.disabled=true;
  backup.onclick=download;
  tools.append(load,send,backup);root.append(tools);
- const hint=mk("p","Сначала выберите существующий проект кухни №4. После загрузки сохранённых материалов появятся список неопределённостей и альтернативы планировки.");
+ const hint=mk("p","Выберите свой существующий проект кухни. После загрузки сохранённых материалов появятся список неопределённостей и альтернативы планировки.");
  hint.id="ridDossierStatus";hint.setAttribute("role","status");root.append(hint);
  const body=mk("div");body.id="ridDossierBody";root.append(body);
  root.append(mk("p","Отчёт с пометкой «Со слов заказчика» не является проверкой специалиста. Не вскрывайте стены, розетки, электропанели и газопровод для фотографирования.","font-size:12px;color:#695c39;margin:12px 0 0"));
@@ -211,15 +211,18 @@ function render(){
  status("Готово: анкета, "+med.length+" медиаматериалов и карта технических неопределённостей связаны в одном просмотре. Для сохранения отчёта поставьте отметку внизу.");
 }
 async function open(){
- if(!validProject(activeProjectId)||!roleAssignmentId)throw Error("Сначала выберите существующий проект кухни №4 в разделе 1.");
+ if(!validProject(activeProjectId)||!roleAssignmentId)throw Error("Сначала выберите свой существующий проект кухни в разделе 1.");
  const btn=$("ridDossierLoad");btn.disabled=true;
  const project=activeProjectId;
  status("Читаем сохранённые материалы, не меняя проект...");
  try{
+  const assignment=roleAssignmentId;
   const [uid,rows]=await Promise.all([currentUser(),fetchRecords(project)]);
-  if(activeProjectId!==project)throw Error("Проект изменён");
-  state={projectId:project,userId:uid,evidence:rows.list,answers:rows.answers,notes:{},checks:{},savedRecord:null,pending:null};
+  if(activeProjectId!==project||roleAssignmentId!==assignment)throw Error("Проект или права доступа изменились");
+  state={projectId:project,userId:uid,assignmentId:roleAssignmentId,evidence:rows.list,answers:rows.answers,notes:{},checks:{},savedRecord:null,pending:null};
   readLocal();
+  const pdfs=rows.list.filter(e=>/RID-KITCHEN-VISUAL-REVIEW\.pdf$/i.test(e.objectName||""));
+  state.savedRecord=pdfs.length?{name:pdfs[pdfs.length-1].objectName,registeredAt:null}:null;
   render();
  }finally{btn.disabled=false;}
 }
@@ -407,10 +410,13 @@ async function serverUser(){
  return uid;
 }
 async function register(name){
- const j=await api("/projects/"+state.projectId+"/pilot",{method:"GET",headers:{"x-role-assignment-id":roleAssignmentId}});
+ if(!isProject())throw Error("Изменился проект или назначение роли.");
+ const j=await api("/projects/"+state.projectId+"/pilot",{method:"GET",headers:{"x-role-assignment-id":state.assignmentId}});
  if(j.data?.evidence?.some(x=>x.objectName===name))return;
+ if(!isProject())throw Error("Изменился проект или назначение роли.");
  await pilotCommand("REGISTER_EVIDENCE",{objectName:name,category:"OTHER",provenance:"CUSTOMER_REPORTED",caption:"Карта наблюдений заказчика · без AI и профессионального подтверждения"});
- const verified=await api("/projects/"+state.projectId+"/pilot",{method:"GET",headers:{"x-role-assignment-id":roleAssignmentId}});
+ if(!isProject())throw Error("Изменился проект или назначение роли.");
+ const verified=await api("/projects/"+state.projectId+"/pilot",{method:"GET",headers:{"x-role-assignment-id":state.assignmentId}});
  if(!verified.data?.evidence?.some(x=>x.objectName===name))throw Error("Регистрация отчёта не подтверждена. Попробуйте ещё раз, не создавая другой проект.");
 }
 async function saveReport(){
@@ -420,6 +426,7 @@ async function saveReport(){
  saving=true;const b=$("ridDossierSend");b.disabled=true;
  try{
   const uid=await serverUser(),project=state.projectId;
+  if(!isProject())throw Error("Проект изменился. Сохранение отменено.");
   if(state.pending?.objectName){
    status("Продолжаем регистрацию ранее загруженного отчёта...");
    await register(state.pending.objectName);
@@ -443,6 +450,7 @@ async function saveReport(){
    throw Error("Хранилище ответило HTTP "+res.status+": "+String(err.message||err.error||"неизвестная ошибка").slice(0,180));
   }
   state.pending={objectName:filename,createdAt:new Date().toISOString()};
+  if(!isProject())throw Error("Проект переключён. Загруженный отчёт не регистрируем в другом проекте.");
   writeLocal();status("Файл отправлен. Проверяем регистрацию в выбранном проекте...");
   await register(filename);
   state.savedRecord={name:filename,registeredAt:new Date().toISOString()};
