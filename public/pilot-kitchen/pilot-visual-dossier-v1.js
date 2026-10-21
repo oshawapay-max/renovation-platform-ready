@@ -254,6 +254,145 @@ function dossier(){
   aiProcessor:"NOT_ACTIVATED_PRIVACY_AND_TECHNICAL_GATES_PENDING"
  };
 }
+
+/* RID_BROWSER_PDF_DOSSIER_V1
+   PDF generated on the customer's device; no external PDF service or fonts.
+   A4 images preserve Cyrillic text; embedded JSON preserves exact typed data.
+   PDF is valid application/pdf and allowed by current private RID Storage policy. */
+async function makeDossierPdf(report){
+ const PAGE_W=1190,PAGE_H=1684,LEFT=91,RIGHT=91,TOP=115,BOTTOM=103;
+ const encoder=new TextEncoder();
+ const sheets=[];let canvas,ctx,y=0;
+ function newPage(){
+  if(sheets.length>=20)throw Error("Карта слишком объёмная (более 20 страниц). Сократите примечания.");
+  canvas=document.createElement("canvas");canvas.width=PAGE_W;canvas.height=PAGE_H;
+  ctx=canvas.getContext("2d",{alpha:false});if(!ctx)throw Error("Не удалось создать PDF: Canvas не поддерживается браузером.");
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,PAGE_W,PAGE_H);
+  ctx.fillStyle="#15503a";ctx.fillRect(0,0,PAGE_W,14);
+  ctx.font="bold 30px Arial, sans-serif";ctx.fillStyle="#254937";
+  ctx.fillText("RID · КАРТА ОБСЛЕДОВАНИЯ КУХНИ",LEFT,74);
+  ctx.fillStyle="#555";ctx.font="20px Arial, sans-serif";
+  ctx.fillText("Предварительные сведения заказчика · Не техническое заключение",LEFT,104);
+  ctx.fillStyle="#e8eeea";ctx.fillRect(LEFT,PAGE_H-84,PAGE_W-LEFT-RIGHT,2);
+  sheets.push(canvas);y=TOP+33;
+ }
+ function addLine(text,style="regular"){
+  const font=style==="title"?"bold 31px Arial, sans-serif":style==="bold"?"bold 25px Arial, sans-serif":"23px Arial, sans-serif";
+  const height=style==="title"?53:style==="bold"?40:36;
+  ctx.font=font;
+  const tokens=String(text??"").replace(/\r/g,"").split(/(\s+)/);
+  const lines=[];let line="";
+  function emit(){if(line.trim())lines.push(line.trim());line="";}
+  for(let token of tokens){
+   if(token==="\n"){emit();continue}
+   if(!token)continue;
+   if(ctx.measureText(line+token).width<=PAGE_W-LEFT-RIGHT){line+=token;continue;}
+   if(line.trim())emit();
+   if(ctx.measureText(token).width>PAGE_W-LEFT-RIGHT){
+     let frag="";
+     for(const ch of Array.from(token)){
+      if(ctx.measureText(frag+ch).width>PAGE_W-LEFT-RIGHT&&frag){lines.push(frag);frag=ch}
+      else frag+=ch;
+     }
+     line=frag;
+   }else line=token;
+  }
+  emit();
+  if(!lines.length)lines.push(" ");
+  for(const l of lines){
+    if(y+height>PAGE_H-BOTTOM)newPage();
+    ctx.font=font;
+    ctx.fillStyle=style==="title"?"#16432f":style==="bold"?"#243d30":"#253329";
+    ctx.fillText(l,LEFT,y+height-11);
+    y+=height;
+  }
+ }
+ function space(pixels=13){
+  if(y+pixels>PAGE_H-BOTTOM)newPage();
+  y+=pixels;
+ }
+ function section(head,items){
+  addLine(head,"bold");space(7);
+  for(const item of items){addLine(item);space(5);}
+  space(10);
+ }
+ newPage();
+ addLine("Проект: "+String(report.projectId||"").slice(0,84),"bold");
+ addLine("Создано: "+String(report.createdAt||""));
+ addLine("Статус: данные заказчика, не обследование специалиста");
+ addLine("AI-процессор видео и фото не использовался. Строительные выводы требуют проверки.");
+ space(18);
+ const src=report.source||{};
+ section("Источники",[ "Сохранённая анкета C01; зарегистрировано материалов: "+Number(src.mediaCount||0)+".",
+  "Материалы остаются в приватном хранилище RID. Этот PDF содержит наблюдения, но не копии исходных фотографий или видео." ]);
+ const observations=Array.isArray(report.observations)?report.observations:[];
+ if(observations.length)section("Наблюдения заказчика",observations.slice(0,40).flatMap((o,i)=>[
+  (i+1)+". "+String(o.format||"Материал")+" · "+String(o.category||"").slice(0,50),
+  "Наблюдение: "+String(o.text||"Не указано").slice(0,2000),
+  "Статус: "+String(o.status||"NOT_REVIEWED")+"; момент видео: "+String(o.videoTimecode||"-"),
+  "Техническая проверка: не выполнена."
+ ]));
+ else section("Наблюдения заказчика",["Утверждённых наблюдений пока нет. Это не означает, что помещение осмотрено."]);
+ const unknowns=Array.isArray(report.unknowns)?report.unknowns:[];
+ section("Вопросы к специалисту",unknowns.slice(0,25).flatMap((x,i)=>[
+  (i+1)+". "+String(x.topic||x.code||"Условие").slice(0,190),
+  "Причина: "+String(x.description||"").slice(0,1500),
+  "Что проверить: "+String(x.verificationNeeded||"").slice(0,1500)
+ ]));
+ section("Сценарии планировки",[
+  "Вариант A: сохранить существующие стены и перераспределить хранение, подготовку, приготовление и мойку.",
+  "Вариант Б: рассмотреть изменение стены только после технической и разрешительной проверки.",
+  "Оба варианта иллюстративные, не размерные планы и не 3D-визуализации."
+ ]);
+ section("Ограничения расчёта",[
+  "Приведённые ранее GTA 2026 ориентиры стоимости не пересчитывались по медиа.",
+  "Официальная смета RID остаётся заблокированной до проверки ценовой модели.",
+  "Профессиональная оценка несущих стен, электрики, газа и скрытых систем не выполнялась.",
+  "Исходный JSON-отчёт включён внутрь PDF как прикреплённый файл для сохранения точных полей и происхождения."
+ ]);
+ if(sheets.length>20)throw Error("Превышен допустимый объём PDF.");
+ const jpegImages=[];
+ for(let i=0;i<sheets.length;i++){
+  const c=sheets[i];const context=c.getContext("2d");
+  context.font="19px Arial, sans-serif";context.fillStyle="#587063";
+  context.fillText("RID · C01 · Только наблюдения заказчика · Стр. "+(i+1)+" / "+sheets.length,LEFT,PAGE_H-47);
+  const blob=await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(Error("Не удалось преобразовать страницу PDF.")),"image/jpeg",0.87));
+  if(blob.type!=="image/jpeg"||blob.size===0)throw Error("Не удалось создать изображение страницы.");
+  jpegImages.push(new Uint8Array(await blob.arrayBuffer()));
+ }
+ const attached=encoder.encode(JSON.stringify(report,null,2));
+ if(attached.length>300000)throw Error("Отчёт слишком большой для сохранения, сократите наблюдения.");
+ const n=jpegImages.length,nObjects=2+3*n+2,jsonId=3+3*n,fileId=4+3*n;
+ const chunks=[];let size=0,offsets=new Array(nObjects+1).fill(0);
+ const write=x=>{const bytes=typeof x==="string"?encoder.encode(x):x;chunks.push(bytes);size+=bytes.length;};
+ const object=(id,body)=>{
+  offsets[id]=size;write(id+" 0 obj\n");
+  if(typeof body==="string")write(body);
+  else for(const part of body)write(part);
+  write("\nendobj\n");
+ };
+ write("%PDF-1.7\n%\u00e2\u00e3\u00cf\u00d3\n");
+ object(1,"<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles << /Names [(RID_KITCHEN_DOSSIER.json) "+fileId+" 0 R] >> >> /AF ["+fileId+" 0 R] >>");
+ object(2,"<< /Type /Pages /Kids ["+jpegImages.map((_,i)=>(3+3*i)+" 0 R").join(" ")+"] /Count "+n+" >>");
+ for(let i=0;i<n;i++){
+  const pageId=3+3*i,contentsId=pageId+1,imageId=pageId+2;
+  object(pageId,"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 "+imageId+" 0 R >> >> /Contents "+contentsId+" 0 R >>");
+  const content="q\n595 0 0 842 0 0 cm\n/Im0 Do\nQ\n";
+  object(contentsId,["<< /Length "+encoder.encode(content).length+" >>\nstream\n",content,"endstream"]);
+  const bytes=jpegImages[i];
+  object(imageId,["<< /Type /XObject /Subtype /Image /Width "+PAGE_W+" /Height "+PAGE_H+" /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "+bytes.length+" >>\nstream\n",bytes,"\nendstream"]);
+ }
+ object(jsonId,["<< /Type /EmbeddedFile /Subtype /application#2Fjson /Length "+attached.length+" /Params << /Size "+attached.length+" >> >>\nstream\n",attached,"\nendstream"]);
+ object(fileId,"<< /Type /Filespec /F (RID_KITCHEN_DOSSIER.json) /UF (RID_KITCHEN_DOSSIER.json) /EF << /F "+jsonId+" 0 R >> /AFRelationship /Data >>");
+ const start=size;
+ write("xref\n0 "+(nObjects+1)+"\n0000000000 65535 f \n");
+ for(let i=1;i<=nObjects;i++)write(String(offsets[i]).padStart(10,"0")+" 00000 n \n");
+ write("trailer\n<< /Size "+(nObjects+1)+" /Root 1 0 R >>\nstartxref\n"+start+"\n%%EOF\n");
+ const result=new Blob(chunks,{type:"application/pdf"});
+ if(!result.size||result.size>45*1024*1024)throw Error("PDF превышает безопасный лимит загрузки.");
+ return result;
+}
+
 function backupFile(r,filename){
  const blob=new Blob([JSON.stringify(r,null,2)],{type:"application/json"});
  const u=URL.createObjectURL(blob),a=mk("a");a.href=u;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),20000);
@@ -290,14 +429,13 @@ async function saveReport(){
    return;
   }
   const report=dossier();
-  const bytes=JSON.stringify(report,null,2);
-  if(bytes.length>150000)throw Error("Карта слишком объёмная. Уменьшите описание.");
-  const filename=uid+"/"+project+"/"+new Date().toISOString().replace(/[:.]/g,"-")+"-"+crypto.randomUUID()+"-RID-KITCHEN-VISUAL-REVIEW.json";
-  const blob=new Blob([bytes],{type:"application/json"});
+  status("Готовим отчёт PDF с русским текстом и приложенными машиночитаемыми данными...");
+  const blob=await makeDossierPdf(report);
+  const filename=uid+"/"+project+"/"+new Date().toISOString().replace(/[:.]/g,"-")+"-"+crypto.randomUUID()+"-RID-KITCHEN-VISUAL-REVIEW.pdf";
   const encoded=filename.split("/").map(encodeURIComponent).join("/");
   status("Отправляем карту обследования в частное хранилище RID...");
   const res=await fetch(SUPABASE_ORIGIN+"/storage/v1/object/rid-evidence/"+encoded,{
-   method:"POST",headers:{apikey:cfg.publishableKey,authorization:"Bearer "+token(),"content-type":"application/json","x-upsert":"false"},
+   method:"POST",headers:{apikey:cfg.publishableKey,authorization:"Bearer "+token(),"content-type":"application/pdf","x-upsert":"false"},
    body:blob,cache:"no-store"
   });
   if(!res.ok){
