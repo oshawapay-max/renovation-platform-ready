@@ -513,9 +513,30 @@ function renderEntry(){
   const allProjects=[...owned,...participant].filter(p=>{if(seen.has(p.projectId))return false;seen.add(p.projectId);return true});
   const eligible=allProjects.filter(p=>(p.domainCodes||[]).map(x=>String(x).toUpperCase()).includes('KITCHEN')&&!/(^|[-_])(dev|test|stress|e2e|fixture|synthetic)([-_]|$)/i.test(String(p.projectId||'')));
   const excluded=allProjects.length-eligible.length;
-  $('projects').innerHTML=eligible.map(p=>'<button class="secondary proj" data-id="'+p.projectId+'">'+p.projectId+' · '+escapeHtml(((p.domainCodes||[])[0]||p.domainCode||''))+' · '+escapeHtml(p.entrySource||'')+'</button>').join('') || '<span class="muted">No eligible clean Kitchen pilot project yet.</span>';
-  if(excluded>0)$('projects').innerHTML+='<p class="muted">'+excluded+' historical/non-Kitchen project(s) hidden from pilot selection.</p>';
-  document.querySelectorAll('.proj').forEach(b=>b.onclick=()=>selectProject(b.dataset.id));
+  $('projects').innerHTML='<p class="muted">Это ваши сохранённые проекты кухни. Кнопка открывает проект здесь же, справа. Новый проект создавать не нужно.</p>'+(
+    eligible.map((p,i)=>'<button type="button" class="secondary proj" data-id="'+escapeHtml(p.projectId)+'">'+(activeProjectId===p.projectId?'✓ ':'')+'Открыть кухню №'+(i+1)+' · '+escapeHtml(p.projectId.slice(0,12))+'…</button>').join('') || '<span class="muted">Сохранённых проектов кухни пока нет.</span>'
+  );
+  if(excluded>0)$('projects').innerHTML+='<p class="muted">'+excluded+' старых или других проектов скрыто из списка.</p>';
+  let pickState=$('projectPickState');
+  if(!pickState){pickState=document.createElement('div');pickState.id='projectPickState';pickState.className='status';pickState.setAttribute('role','status');$('projects').insertAdjacentElement('afterend',pickState);}
+  pickState.textContent=activeProjectId?'Выбран проект '+activeProjectId.slice(0,12)+'…':'Ни один проект пока не выбран. Для продолжения нажмите кнопку нужной кухни.';
+  document.querySelectorAll('.proj').forEach(b=>b.onclick=async()=>{
+    const chosenId=b.dataset.id,buttons=[...document.querySelectorAll('.proj')];
+    pickState.textContent='Открываем проект '+chosenId.slice(0,12)+'… Пожалуйста, подождите.';
+    buttons.forEach(x=>x.disabled=true);
+    try{
+      await selectProject(chosenId);
+      if(activeProjectId!==chosenId||!roleAssignmentId||!workspace)throw new Error('Не удалось подтвердить доступ к рабочему пространству.');
+      buttons.forEach(x=>{x.style.outline=x.dataset.id===chosenId?'3px solid #438d62':'';x.style.background=x.dataset.id===chosenId?'#21593a':'#666';});
+      pickState.textContent='✓ Открыт проект '+chosenId.slice(0,12)+'… Его состояние показано справа. Для просмотра уже отправленной анкеты используйте кнопку «Открыть уже сохранённый проект» в разделе 4.';
+      pickState.className='status good';
+      const active=$('activeProject');if(active)active.scrollIntoView({behavior:'smooth',block:'center'});
+    }catch(e){
+      pickState.className='status risk';
+      pickState.textContent='Не удалось открыть проект '+chosenId.slice(0,12)+'…: '+String(e?.message||e||'неизвестная ошибка')+'. Ничего не удалено. Попробуйте другой проект или сообщите этот текст.';
+      say(String(e?.message||e||'Ошибка открытия проекта'),'risk');
+    }finally{buttons.forEach(x=>x.disabled=false);}
+  });
   const portfolios=(entry.portfolios||[]);
   $('propertyPortfolio').innerHTML=portfolios.map(x=>'<option value="'+x.portfolioId+'">'+escapeHtml(x.portfolioName)+'</option>').join('');
   const props=(entry.properties||[]);
