@@ -20,7 +20,7 @@ const info=document.createElement("div");
 info.id="ridUploadHelp";
 info.className="muted";
 info.style.margin="9px 0";
-info.textContent="Можно выбрать сразу несколько фото или видео (Shift или Ctrl в окне выбора). MP4, MOV и WebM больше 50 МБ автоматически сжимаются в браузере, при этом исходный файл на компьютере сохраняется. Подготовка видео занимает время, примерно сопоставимое с длительностью ролика. После обработки файлы загружаются только в выбранный проект.";
+info.textContent="Можно выбрать несколько фото и видео. Для MP4, MOV и WebM свыше 50 МБ RID автоматически загружает исходный файл частями до 16 МБ, без ухудшения качества. Это единый видеоматериал внутри пилота, который можно скачать целиком. После сохранения он появится в списке ниже. Поддерживаются видео до 256 МБ.";
 fileInput.insertAdjacentElement("afterend",info);
 const queue=document.createElement("div");queue.id="ridUploadQueue";queue.setAttribute("aria-live","polite");fileInput.insertAdjacentElement("afterend",queue);
 const registry=document.createElement("div");registry.id="ridProjectEvidence";registry.setAttribute("aria-live","polite");
@@ -62,125 +62,132 @@ function fileIssue(file){
  return null;
 }
 
-/* RID_AUTO_VIDEO_COMPRESSION_v1
-   Runs entirely on the user's device. Never uploads the original oversized video.
-   Audio/video transcoding uses HTMLMediaElement.captureStream() + MediaRecorder.
-   Only authenticated, registered result is considered saved to RID. */
+/* RID_VIDEO_PACK_V1: Preserve original MP4/MOV/WebM bytes by uploading bounded parts.
+   Each part is a byte range of the same video media type; the registered first part
+   bears a manifest caption. The pilot UI can reassemble the exact original file.
+   This is a PILOT ADAPTER, not yet a native whole-file backend or AI video parser.
+   No server limits, storage policies or production databases are changed. */
+const RID_VIDEO_CHUNK_BYTES=16*1024*1024;
+const RID_VIDEO_MAX_BYTES=256*1024*1024;
+const RID_VIDEO_CAPTION_PREFIX="RID_VIDEO_PARTS_V1|";
 function needsVideoOptimization(file){
-  const mime=allowedMime(file);
-  return file.size>MAX_BYTES && typeof mime==='string' && mime.startsWith('video/');
+ const mime=allowedMime(file);
+ return file.size>MAX_BYTES && typeof mime==="string" && mime.startsWith("video/");
 }
-/* RID_VIDEO_CANVAS_ENCODER_V2: customer-device transcoding.
-   The original HTMLMediaElement.captureStream() path could return no video
-   tracks for specific Chromium/Edge codecs. Canvas generates an independent
-   video track; WebAudio carries the source audio into the recorded result. */
-function videoCompressionSupported(){
-  return typeof MediaRecorder!=='undefined' &&
-    typeof HTMLCanvasElement!=='undefined' &&
-    typeof HTMLCanvasElement.prototype.captureStream==='function' &&
-    typeof AudioContext!=='undefined' &&
-    ['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].some(type=>MediaRecorder.isTypeSupported(type));
+function videoChunkFilename(stem,index,ext){
+ return stem+"-p"+String(index).padStart(3,"0")+"."+ext;
 }
-async function runVideoCompressionPass(file,report,targetBytes,qualityFactor){
-  if(!videoCompressionSupported())throw Error('Этот браузер не поддерживает безопасную обработку видео. Откройте Kitchen Pilot в актуальном Edge или Chrome.');
-  const mimeType=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(type=>MediaRecorder.isTypeSupported(type));
-  const url=URL.createObjectURL(file);
-  const video=document.createElement('video');
-  video.muted=true; video.playsInline=true; video.preload='auto';
-  video.style.cssText='position:fixed;width:2px;height:2px;left:-99999px;top:0;opacity:0;pointer-events:none';
-  document.body.appendChild(video);
-  let recorder=null,stream=null,audioCtx=null,timer=null,watchdog=null,drawTimer=null;
-  const cleanup=()=>{
-    if(timer!==null)clearInterval(timer);
-    if(watchdog!==null)clearTimeout(watchdog);
-    if(drawTimer!==null)clearInterval(drawTimer);
-    try{if(recorder&&recorder.state!=='inactive')recorder.stop()}catch{}
-    try{video.pause();video.removeAttribute('src');video.load();video.remove()}catch{}
-    if(stream)for(const track of stream.getTracks())try{track.stop()}catch{}
-    if(audioCtx)try{audioCtx.close()}catch{}
-    URL.revokeObjectURL(url);
-  };
-  try{
-    video.src=url;
-    await new Promise((resolve,reject)=>{
-      if(video.readyState>=1)return resolve();
-      video.addEventListener('loadedmetadata',resolve,{once:true});
-      video.addEventListener('error',()=>reject(Error('Этот видеофайл не удалось декодировать в браузере. Оригинал не изменён.')),{once:true});
-      video.load();
+async function sha256Hex(blob){
+ if(!crypto?.subtle?.digest)throw Error("Безопасная проверка целостности видео недоступна в браузере.");
+ const bytes=await blob.arrayBuffer();
+ const hash=await crypto.subtle.digest("SHA-256",bytes);
+ return Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,"0")).join("");
+}
+function videoPackageInfo(ev){
+ if(!ev?.caption?.startsWith(RID_VIDEO_CAPTION_PREFIX))return null;
+ try{
+  const data=JSON.parse(ev.caption.slice(RID_VIDEO_CAPTION_PREFIX.length));
+  const name=String(ev.objectName||"");
+  const matched=name.match(/^(.*-ridvid1-[^/]+)-p000\.(mp4|mov|webm)$/);
+  if(!matched||data.v!==1||!Number.isInteger(data.n)||data.n<2||data.n>16||
+     !Number.isInteger(data.z)||data.z<MAX_BYTES||data.z>RID_VIDEO_MAX_BYTES||
+     typeof data.sha!=="string"||!/^[0-9a-f]{64}$/.test(data.sha)||
+     typeof data.f!=="string"||data.f.length>120||
+     !["mp4","mov","webm"].includes(matched[2]))return null;
+  return {...data,stem:matched[1],ext:matched[2],mime:MIME_BY_EXT[matched[2]]};
+ }catch{return null;}
+}
+function pendingVideoKey(projectId,file){
+ return "ridKitchenVideoParts:v1:"+projectId+":"+file.name.slice(-80)+":"+file.size+":"+file.lastModified;
+}
+async function uploadVideoPackage(file,index,projectId,userId,category){
+ if(file.size>RID_VIDEO_MAX_BYTES)throw Error("Размер видео превышает ограничение пилота 256 МБ. Файл остаётся на вашем компьютере.");
+ const mime=allowedMime(file),ext=(file.name.split(".").pop()||"").toLowerCase();
+ const count=Math.ceil(file.size/RID_VIDEO_CHUNK_BYTES);
+ if(count>16)throw Error("Слишком длинный видеофайл для текущего пилота.");
+ const key=pendingVideoKey(projectId,file);
+ let prior;
+ try{prior=JSON.parse(sessionStorage.getItem(key)||"null");}catch{prior=null;}
+ if(prior&&(prior.userId!==userId||prior.projectId!==projectId||prior.size!==file.size||prior.ext!==ext))prior=null;
+ const stem=prior?.stem||userId+"/"+projectId+"/"+Date.now()+"-"+crypto.randomUUID()+"-ridvid1-"+safeName(file.name).slice(-60);
+ if(!stem.startsWith(userId+"/"+projectId+"/")||!stem.includes("-ridvid1-"))throw Error("Неверное имя проекта для видео.");
+ const done=new Set(Array.isArray(prior?.done)?prior.done.filter(n=>Number.isInteger(n)&&n>=0&&n<count):[]);
+ const save=()=>{try{sessionStorage.setItem(key,JSON.stringify({v:1,userId,projectId,ext,size:file.size,stem,done:[...done]}))}catch{}};
+ save();
+ setFileState(index,"Видео "+humanSize(file.size)+": готовим передачу "+count+" частей без потери качества.");
+ const hash=await sha256Hex(file);
+ const cap=RID_VIDEO_CAPTION_PREFIX+JSON.stringify({v:1,n:count,z:file.size,sha:hash,f:file.name.slice(-100),m:mime,c:(document.getElementById("evidenceCaption")?.value||"").trim().slice(0,85)});
+ if(cap.length>500)throw Error("Слишком длинное описание видео. Сократите описание и повторите.");
+ const first=videoChunkFilename(stem,0,ext);
+ const item={objectName:first,category,provenance:document.getElementById("evidenceProvenance")?.value||"CUSTOMER_REPORTED",caption:cap,filename:file.name};
+ const existing=await getPilotEvidence(projectId);
+ if(existing.evidence.some(e=>e.objectName===first)){try{sessionStorage.removeItem(key)}catch{};return item;}
+ for(let part=0;part<count;part++){
+  if(activeProjectId!==projectId)throw Error("Вы переключили проект во время загрузки. Передача остановлена.");
+  const name=videoChunkFilename(stem,part,ext);
+  if(done.has(part)){setFileState(index,"Продолжаем ранее начатую загрузку: "+part+" из "+count+" частей уже сохранены.");continue;}
+  const blob=file.slice(part*RID_VIDEO_CHUNK_BYTES,Math.min((part+1)*RID_VIDEO_CHUNK_BYTES,file.size),mime);
+  const encoded=name.split("/").map(encodeURIComponent).join("/");
+  let stored=false,lastError=null;
+  for(let attempt=1;attempt<=3&&!stored;attempt++){
+   try{
+    setFileState(index,"Видео: отправляем часть "+(part+1)+" из "+count+" ("+Math.floor(part/count*100)+"%). Исходник не изменяется.");
+    const r=await fetch(SUPABASE_ORIGIN+"/storage/v1/object/rid-evidence/"+encoded,{
+      method:"POST",headers:{apikey:cfg.publishableKey,authorization:"Bearer "+token(),"content-type":mime,"x-upsert":"false"},
+      body:blob,cache:"no-store"
     });
-    const duration=video.duration;
-    if(!Number.isFinite(duration)||duration<=0||duration>3600)throw Error('Не удалось прочитать длительность видео (допустима запись до 60 минут).');
-    if(!video.videoWidth||!video.videoHeight)throw Error('Браузер не смог декодировать кадры исходного видео.');
-    const ratio=Math.min(1,1280/video.videoWidth,720/video.videoHeight);
-    const width=Math.max(2,Math.round(video.videoWidth*ratio/2)*2);
-    const height=Math.max(2,Math.round(video.videoHeight*ratio/2)*2);
-    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
-    const context=canvas.getContext('2d',{alpha:false});
-    if(!context)throw Error('Браузер не смог создать видеокадры для сжатия.');
-    context.fillStyle='#000';context.fillRect(0,0,width,height);
-    stream=canvas.captureStream(20);
-    if(stream.getVideoTracks().length!==1)throw Error('Не удалось создать видеодорожку из кадров.');
-    try{
-      audioCtx=new AudioContext();
-      const source=audioCtx.createMediaElementSource(video);
-      const audioOutput=audioCtx.createMediaStreamDestination();
-      source.connect(audioOutput);
-      await audioCtx.resume();
-      if(audioCtx.state!=='running'||!audioOutput.stream.getAudioTracks().length)throw Error('Audio track unavailable');
-      for(const track of audioOutput.stream.getAudioTracks())stream.addTrack(track);
-    }catch(e){
-      throw Error('Не удалось подготовить звуковую дорожку без потерь. Видео не отправлено; исходный файл сохранён.');
-    }
-    const maxTotalBitrate=(targetBytes*8/duration)*qualityFactor;
-    const inputBitrate=(file.size*8/duration)*0.82;
-    const videoBps=Math.max(180000,Math.floor(Math.min(maxTotalBitrate,inputBitrate)-96000));
-    const chunks=[];
-    recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:videoBps,audioBitsPerSecond:96000});
-    const completed=new Promise((resolve,reject)=>{
-      recorder.addEventListener('dataavailable',event=>{if(event.data&&event.data.size>0)chunks.push(event.data)});
-      recorder.addEventListener('error',event=>reject(Error(event?.error?.message||'Ошибка кодирования видео')),{once:true});
-      recorder.addEventListener('stop',resolve,{once:true});
-      video.addEventListener('error',()=>reject(Error('Ошибка воспроизведения исходного видео')),{once:true});
-      video.addEventListener('ended',()=>{if(recorder?.state==='recording')recorder.stop()},{once:true});
-    });
-    drawTimer=setInterval(()=>{
-      if(video.readyState>=2&&!video.paused&&!video.ended){
-        try{context.drawImage(video,0,0,width,height)}catch{}
+    if(!r.ok){
+      const parsed=await r.json().catch(()=>({}));
+      // If an interrupted request did succeed, verify exact bytes of the
+      // existing private object, rather than skipping or overwriting it.
+      if(r.status===400||r.status===409){
+       const er=String(parsed.error||parsed.message||"");
+       if(/already exists|duplicate|asset already exists/i.test(er)){
+        const check=await fetch(SUPABASE_ORIGIN+"/storage/v1/object/authenticated/rid-evidence/"+encoded,{
+         headers:{apikey:cfg.publishableKey,authorization:"Bearer "+token()},cache:"no-store"
+        });
+        if(check.ok&&await sha256Hex(await check.blob())===await sha256Hex(blob))stored=true;
+       }
       }
-    },50);
-    recorder.start(1000);
-    timer=setInterval(()=>report(Math.max(0,Math.min(99,Math.floor(video.currentTime/duration*100)))),600);
-    const timeout=new Promise((_,reject)=>{
-      watchdog=setTimeout(()=>reject(Error('Сжатие заняло слишком много времени. Оригинал сохранён, можно повторить загрузку.')),(duration*2+45)*1000);
-    });
-    await video.play();
-    // Sound flows only to the in-memory recording, not to the computer speakers.
-    video.muted=false;
-    await Promise.race([completed,timeout]);
-    const blob=new Blob(chunks,{type:'video/webm'});
-    if(blob.size===0||blob.size>=file.size)throw Error('Сжатие не уменьшило размер видео. Исходный файл сохранён на компьютере.');
-    report(100);
-    return new File([blob],(file.name||'video').replace(/\.[^.]+$/,'')+'.rid-optimized.webm',{type:'video/webm',lastModified:Date.now()});
-  }finally{cleanup();}
-}
-async function optimizeVideoForUpload(file,index){
-  if(!needsVideoOptimization(file))return file;
-  const originalMb=humanSize(file.size);
-  setFileState(index,'Сжимаем видео '+originalMb+' прямо в браузере. Исходный файл не изменится. Не закрывайте вкладку.');
-  const targetBytes=43*1024*1024;
-  const qualityFactors=[0.84,0.63];
-  let converted=null;
-  for(let pass=0;pass<qualityFactors.length;pass++){
-    if(pass) setFileState(index,'Первая попытка оказалась слишком большой. Подбираем более сильное сжатие...');
-    const prefix=pass?'Повторное сжатие':'Сжатие видео';
-    converted=await runVideoCompressionPass(file,percent=>{
-      setFileState(index,prefix+': '+percent+'%. Видео обрабатывается на вашем компьютере, звук сохраняется.');
-    },targetBytes,qualityFactors[pass]);
-    if(converted.size<=MAX_BYTES)break;
+      if(!stored)throw Error("HTTP "+r.status+" "+String(parsed.message||parsed.error||"UPLOAD_FAILED").slice(0,220));
+    }else stored=true;
+   }catch(e){
+    lastError=e;
+    if(!stored&&attempt<3)await new Promise(resolve=>setTimeout(resolve,attempt*450));
+   }
   }
-  if(!converted||converted.size>MAX_BYTES)throw Error('Не удалось уменьшить видео до 50 МБ без дополнительной обработки. Оригинал сохранён на компьютере.');
-  setFileState(index,'Видео подготовлено: '+originalMb+' → '+humanSize(converted.size)+'. Передаём в RID...');
-  return converted;
+  if(!stored)throw Error("Не удалось передать часть "+(part+1)+" из "+count+": "+String(lastError?.message||lastError||"ошибка").slice(0,240)+". Уже отправленные части сохраняются для повтора.");
+  done.add(part);save();
+  setFileState(index,"Видео: сохранены "+done.size+" из "+count+" частей ("+Math.floor(done.size/count*100)+"%).");
+ }
+ writePending(projectId,item);
+ setFileState(index,"Все части видео переданы. Регистрируем один видеоматериал в проекте RID...");
+ const p=await registerObject(item,projectId);
+ if(!p.evidence.some(e=>e.objectName===first))throw Error("Подтверждение регистрации видео не найдено.");
+ try{sessionStorage.removeItem(key)}catch{}
+ setFileState(index,"Полное видео "+humanSize(file.size)+" сохранено без сжатия ("+count+" частей) ✓",true);
+ return item;
+}
+async function retrieveVideoPackage(ev,pack){
+ const chunks=[];
+ let total=0;
+ for(let i=0;i<pack.n;i++){
+  setStatus("Восстанавливаем исходное видео: часть "+(i+1)+" из "+pack.n+".");
+  const name=videoChunkFilename(pack.stem,i,pack.ext);
+  const encoded=name.split("/").map(encodeURIComponent).join("/");
+  const r=await fetch(SUPABASE_ORIGIN+"/storage/v1/object/authenticated/rid-evidence/"+encoded,{
+   headers:{apikey:cfg.publishableKey,authorization:"Bearer "+token()},cache:"no-store"
+  });
+  if(!r.ok)throw Error("Недоступна часть "+(i+1)+" из "+pack.n+" (HTTP "+r.status+").");
+  const blob=await r.blob();
+  total+=blob.size;
+  if(total>RID_VIDEO_MAX_BYTES)throw Error("Размер восстановленного видео превышает предел безопасности.");
+  chunks.push(blob);
+ }
+ if(total!==pack.z)throw Error("Видео неполное: размер отличается от исходного. Не открывайте его как подтверждённое.");
+ const assembled=new Blob(chunks,{type:pack.mime});
+ if(await sha256Hex(assembled)!==pack.sha)throw Error("Проверка SHA-256 не совпала: видео не подтверждено, сообщите об ошибке RID.");
+ return assembled;
 }
 
 function safeName(name){
@@ -217,7 +224,7 @@ function updateQueue(){
    const state=document.createElement("div");state.className="muted";state.id="ridUploadState"+i;state.style.marginTop="4px";
    const issue=fileIssue(file);
    if(issue){state.textContent="Пропущен: "+issue;state.style.color="#9a4400";line.style.borderColor="#c77";line.style.background="#fff7f6";cat.disabled=true;}
-   else if(needsVideoOptimization(file))state.textContent="Будет автоматически сжато до 50 МБ при загрузке (на этом компьютере). Исходное видео останется без изменений.";
+   else if(needsVideoOptimization(file))state.textContent="Видео будет автоматически передано частями по 16 МБ, без сжатия. После загрузки RID восстановит полный оригинал. Ничего устанавливать не нужно.";
    else state.textContent="Ожидает загрузки";
    line.append(name,cat,state);queue.appendChild(line);
  }
@@ -257,9 +264,10 @@ function showRegistry(p){
   const line=document.createElement("div");line.style.cssText="display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;border-bottom:1px solid #ddd;padding:9px 0";
   const title=document.createElement("div");title.style.cssText="flex:1;min-width:210px";
   const fileName=(ev.objectName||"").split("/").pop();
-  const caption=document.createElement("strong");caption.textContent=ev.caption||fileName||"Файл";title.appendChild(caption);
-  const details=document.createElement("div");details.className="muted";details.textContent=labelFor(ev.category)+" · "+(ev.sizeBytes?humanSize(ev.sizeBytes):"размер не указан")+" · зарегистрировано в RID";title.appendChild(details);
-  const download=document.createElement("button");download.type="button";download.className="secondary";download.textContent="Скачать / открыть";download.onclick=()=>openSaved(ev).catch(e=>setStatus("Не удалось открыть файл: "+friendlyError(e),"error"));
+  const pkg=videoPackageInfo(ev);
+  const caption=document.createElement("strong");caption.textContent=pkg?("Видео: "+pkg.f):(ev.caption||fileName||"Файл");title.appendChild(caption);
+  const details=document.createElement("div");details.className="muted";details.textContent=labelFor(ev.category)+" · "+(pkg?humanSize(pkg.z):(ev.sizeBytes?humanSize(ev.sizeBytes):"размер не указан"))+" · "+(pkg?("сохранено без сжатия ("+pkg.n+" частей), просмотр/скачивание в пилоте"):"зарегистрировано в RID");title.appendChild(details);
+  const download=document.createElement("button");download.type="button";download.className="secondary";download.textContent=pkg?"Скачать целое видео":"Скачать / открыть";download.onclick=()=>openSaved(ev).catch(e=>setStatus("Не удалось открыть файл: "+friendlyError(e),"error"));
   line.append(title,download);registry.appendChild(line);
  }
  const ids=new Set(records.map(x=>x.objectName));
@@ -281,6 +289,16 @@ async function refreshRegistry(){
 async function openSaved(ev){
  const name=ev?.objectName;
  if(!name)throw Error("FILE_NOT_FOUND");
+ const pkg=videoPackageInfo(ev);
+ if(pkg){
+  const blob=await retrieveVideoPackage(ev,pkg);
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download=pkg.f||"rid-kitchen-video."+pkg.ext;
+  document.body.appendChild(a);a.click();a.remove();
+  setStatus("Видео "+humanSize(pkg.z)+" восстановлено и проверено SHA-256. Загрузка исходного файла начата.","good");
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  return;
+ }
  const encoded=name.split("/").map(encodeURIComponent).join("/");
  const r=await fetch(SUPABASE_ORIGIN+"/storage/v1/object/authenticated/rid-evidence/"+encoded,{headers:{apikey:cfg.publishableKey,authorization:"Bearer "+token()},cache:"no-store"});
  if(!r.ok)throw Error("HTTP "+r.status);
@@ -345,8 +363,15 @@ async function uploadBatch(){
      if(uploadedThisSelection.has(key)){completed++;continue;}
      setFileState(i,"Подготавливаем файл "+(i+1)+" из "+files.length+"…");
      try{
-       const f=await optimizeVideoForUpload(originalFile,i);
-       if(!allowedMime(f)||f.size===0||f.size>MAX_BYTES)throw Error("Подготовленный файл превышает лимит 50 МБ или имеет неподдерживаемый формат.");
+       if(needsVideoOptimization(originalFile)){
+        await uploadVideoPackage(originalFile,i,projectId,id,selectedCategory.get(key)||existingCategory.value||"ROOM_OVERVIEW");
+        uploadedThisSelection.add(key);completed++;
+        setStatus("Видео «"+originalFile.name+"» сохранено в проекте без потери качества.","good");
+        await refreshRegistry();
+        continue;
+       }
+       const f=originalFile;
+       if(!allowedMime(f)||f.size===0||f.size>MAX_BYTES)throw Error("Файл превышает лимит 50 МБ или имеет неподдерживаемый формат.");
        const originalName=f.name;
        const objectName=id+"/"+projectId+"/"+Date.now()+"-"+crypto.randomUUID()+"-"+safeName(originalName);
        const mime=allowedMime(f);
@@ -370,7 +395,7 @@ async function uploadBatch(){
        setStatus("Сохранено: "+completed+" из "+files.length+". Файлы регистрируются по очереди.");
        await refreshRegistry();
      }catch(e){
-       failed++;setFileState(i,"Ошибка: "+friendlyError(e));setStatus("Не удалось загрузить «"+f.name+"»: "+friendlyError(e),"error");
+       failed++;setFileState(i,"Ошибка: "+friendlyError(e));setStatus("Не удалось загрузить «"+originalFile.name+"»: "+friendlyError(e),"error");
      }
    }
    await refreshRegistry();
