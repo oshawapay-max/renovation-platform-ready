@@ -16,13 +16,15 @@ let selectedOnce=false,lastStatus="";let lastSavedAt=0,restoredProject=null;
 const el=id=>document.getElementById(id);
 const getProj=()=>typeof activeProjectId==="string"&&activeProjectId?activeProjectId:null;
 const isUuid=x=>typeof x==="string"&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(x);
+// RID project identifiers are normally rid-<32 hex>, not UUIDs.
+const isProjectId=x=>typeof x==="string"&&(/^(?:rid-[0-9a-f]{32})$/i.test(x)||isUuid(x));
 function storageOkay(){
  if(storageAvailable!==null)return storageAvailable;
  try{const k="rid:kitchen:draft:probe";localStorage.setItem(k,"1");localStorage.removeItem(k);storageAvailable=true;}
  catch{storageAvailable=false;}
  return storageAvailable;
 }
-function prefixFor(p){return userId&&p&&isUuid(userId)&&isUuid(p)?PREFIX+userId+":"+p:null;}
+function prefixFor(p){return userId&&p&&isUuid(userId)&&isProjectId(p)?PREFIX+userId+":"+p:null;}
 function setupKey(){return userId&&isUuid(userId)?SETUP_PREFIX+userId:null;}
 function lastKey(){return userId&&isUuid(userId)?LAST_PREFIX+userId:null;}
 function read(key){
@@ -113,7 +115,7 @@ function saveNow(show=false){
  }
  saveSetup();
  const p=getProj();if(!p){if(show)status("Данные создания объекта сохранены в браузере. Выберите существующий проект или создайте новый.");return true;}
- if(!isUuid(p))return false;
+ if(!isProjectId(p)){if(show)status("Проект имеет неподдерживаемый идентификатор. Черновик НЕ сохранён, пожалуйста, сообщите в RID.",true);return false;}
  const old=readSnapshot()||{};
  const inDom=snapshotAnswers();
  const answers={...(old.answers||{}),...inDom};
@@ -126,7 +128,7 @@ function saveNow(show=false){
    lastSubmittedAt:old.lastSubmittedAt||null,serverIntentAtSave:serverGoals()||null,
    lastServerRevision:typeof workspace?.revision==="number"?workspace.revision:null};
  const ok=write(prefixFor(p),next);
- if(ok){lastSavedAt=next.savedAt;if(show||Object.keys(inDom).length)status("Черновик автоматически сохранён в этом браузере в "+stamp(next.savedAt)+".");}
+ if(ok){lastSavedAt=next.savedAt;if(show||Object.keys(inDom).length)status("Черновик проекта "+p.slice(0,12)+"… сохранён локально в "+stamp(next.savedAt)+". Для постоянного сохранения используйте «Сохранить анкету в RID».");}
  return ok;
 }
 function beforeProjectSwitch(){
@@ -188,7 +190,7 @@ function onPilotLoaded(p){
 async function onProjectSelected(){
  const p=getProj();
  if(!p||!userId)return;
- if(!isUuid(p))return;
+ if(!isProjectId(p)){status("Не удалось связать черновик с выбранным проектом.",true);return;}
  selectedOnce=true;
  try{localStorage.setItem(lastKey(),p);}catch{}
  const saved=readSnapshot();
