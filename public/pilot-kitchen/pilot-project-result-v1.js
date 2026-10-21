@@ -14,9 +14,11 @@ function resultPanel(){
  const p=el('p','Заполните анкету и нажмите кнопку ниже. Ответы будут отправлены в ваш проект RID. Затем появится описание ваших пожеланий и состояние предварительной оценки.');panel.appendChild(p);
  const button=el('button','Сохранить анкету и показать предварительный проект');button.type='button';button.id='ridCustomerProjectSubmit';button.style.cssText='background:#174b30;color:white;padding:12px 16px;border-radius:8px;cursor:pointer';
  const btn2=el('button','Открыть уже сохранённый проект');btn2.type='button';btn2.id='ridCustomerProjectReload';btn2.className='secondary';btn2.style.marginLeft='8px';
+ const confirm=el('button','Подтвердить выбранные цели ремонта');confirm.type='button';confirm.id='ridConfirmGoalsBeforeSave';confirm.className='secondary';confirm.style.cssText='display:none;margin:8px 0;background:#b45309;color:white';
+ confirm.onclick=()=>confirmGoals().catch(e=>msg('Не удалось подтвердить цели: '+safe(e.message),true));
  const status=el('p','');status.id='ridCustomerProjectStatus';status.setAttribute('role','status');
  const result=el('div');result.id='ridCustomerProjectResult';
- panel.append(button,btn2,status,result);
+ panel.append(button,btn2,confirm,status,result);
  section.insertBefore(panel,form);
  button.onclick=()=>doSubmit().catch(e=>msg('Не удалось сохранить: '+safe(e.message),true));
  btn2.onclick=()=>showSaved().catch(e=>msg('Не удалось открыть проект: '+safe(e.message),true));
@@ -60,12 +62,36 @@ async function readEstimate(){
   return j.data||null;
  }catch(e){msg('Анкета доступна. Предварительная оценка пока не загружена: '+safe(e.message));return null;}
 }
+async function confirmGoals(){
+ const button=$('ridConfirmGoalsBeforeSave');if(button)button.disabled=true;
+ try{
+  window.RIDKitchenDraft?.saveNow(true);
+  if(!activeProjectId||!roleAssignmentId)throw Error('Сначала выберите ваш существующий проект кухни.');
+  const j=await api('/projects/'+activeProjectId+'/pilot',{method:'GET',headers:{'x-role-assignment-id':roleAssignmentId}});
+  let intent=j.data?.coreIntent;
+  if(!intent)throw Error('Сначала создайте набор целей в разделе 3.');
+  if(intent.status==='CONFIRMED'){msg('Цели уже подтверждены в RID. Теперь можно сохранять анкету.');button.style.display='none';return;}
+  if(intent.status!=='DRAFT'||!intent.intentPackageId)throw Error('Необходимо выбрать и сохранить цели в разделе 3.');
+  // Explicit customer action only. Preserve local C01 before reload.
+  await intentCommand('CONFIRM_PROJECT_INTENT',{intentPackageId:intent.intentPackageId});
+  msg('Цели подтверждены на сервере RID. Сохранённый локальный черновик анкеты можно отправить.');
+  button.style.display='none';
+ }finally{if(button)button.disabled=false;}
+}
 async function doSubmit(){
  const b=$('ridCustomerProjectSubmit');if(b)b.disabled=true;
  try{
   if(!activeProjectId||!roleAssignmentId)throw Error('Сначала выберите проект кухни в верхней части страницы.');
   if(!prelimSchema){msg('Загружаем анкету кухни...');await loadPrelim();}
   window.RIDKitchenDraft?.saveNow(false);
+  msg('Проверяем выбранные цели ремонта...');
+  const intent=(await api('/projects/'+activeProjectId+'/pilot',{method:'GET',headers:{'x-role-assignment-id':roleAssignmentId}})).data?.coreIntent;
+  if(intent?.status!=='CONFIRMED'){
+    $('ridConfirmGoalsBeforeSave').style.display='';
+    msg(intent?.status==='DRAFT'?'Выбранные цели пока только в черновике. Нажмите «Подтвердить выбранные цели ремонта», затем повторите сохранение анкеты. Ваши ответы останутся в браузере.':'Сначала сохраните набор целей в разделе 3, затем подтвердите их. Анкету повторять не нужно.',true);
+    return;
+  }
+  $('ridConfirmGoalsBeforeSave').style.display='none';
   msg('Проверяем заполненные ответы...');
   const preview=await prelim(false);
   const missing=preview?.data?.missing||preview?.data?.missingRequired||[];
