@@ -21,7 +21,7 @@ const mk=(tag,text,css)=>{
  const e=document.createElement(tag);if(text!==undefined)e.textContent=String(text);
  if(css)e.style.cssText=css;return e;
 };
-const isProject=()=>state.projectId&&activeProjectId===state.projectId&&roleAssignmentId;
+const isProject=()=>state.projectId&&activeProjectId===state.projectId&&roleAssignmentId&&state.assignmentId===roleAssignmentId;
 const status=(str,bad=false)=>{
  const e=$("ridDossierStatus");if(e){e.textContent=str;e.style.color=bad?"#a32d2a":"#2b6842";}
 };
@@ -60,8 +60,10 @@ function makeUI(){
  send.onclick=()=>saveReport().catch(e=>status("Отчёт не подтверждён: "+String(e.message||e),true));
  const backup=mk("button","Скачать копию карты");backup.id="ridDossierBackup";backup.type="button";backup.className="secondary";backup.disabled=true;
  backup.onclick=download;
- tools.append(load,send,backup);root.append(tools);
- const hint=mk("p","Сначала выберите существующий проект кухни №4. После загрузки сохранённых материалов появятся список неопределённостей и альтернативы планировки.");
+ const reopen=mk("button","Открыть сохранённую PDF-карту");reopen.type="button";reopen.id="ridDossierReopen";reopen.className="secondary";reopen.disabled=true;
+ reopen.onclick=()=>reopenSavedPdf().catch(e=>status("Не удалось открыть PDF: "+String(e.message||e),true));
+ tools.append(load,send,backup,reopen);root.append(tools);
+ const hint=mk("p","Выберите свой существующий проект кухни. После загрузки сохранённых материалов появятся список неопределённостей и альтернативы планировки.");
  hint.id="ridDossierStatus";hint.setAttribute("role","status");root.append(hint);
  const body=mk("div");body.id="ridDossierBody";root.append(body);
  root.append(mk("p","Отчёт с пометкой «Со слов заказчика» не является проверкой специалиста. Не вскрывайте стены, розетки, электропанели и газопровод для фотографирования.","font-size:12px;color:#695c39;margin:12px 0 0"));
@@ -208,18 +210,22 @@ function render(){
  t.append(cb,mk("span","Я понимаю, что моя карта содержит предварительные сведения заказчика и вопросы для проверки. Я не подтверждаю безопасность конструкций, электрики или газового оборудования."));
  row.append(t);area.append(row);
  $("ridDossierSend").disabled=true;$("ridDossierBackup").disabled=false;
+ $("ridDossierReopen").disabled=!state.savedRecord?.name;
  status("Готово: анкета, "+med.length+" медиаматериалов и карта технических неопределённостей связаны в одном просмотре. Для сохранения отчёта поставьте отметку внизу.");
 }
 async function open(){
- if(!validProject(activeProjectId)||!roleAssignmentId)throw Error("Сначала выберите существующий проект кухни №4 в разделе 1.");
+ if(!validProject(activeProjectId)||!roleAssignmentId)throw Error("Сначала выберите свой существующий проект кухни в разделе 1.");
  const btn=$("ridDossierLoad");btn.disabled=true;
  const project=activeProjectId;
  status("Читаем сохранённые материалы, не меняя проект...");
  try{
+  const assignment=roleAssignmentId;
   const [uid,rows]=await Promise.all([currentUser(),fetchRecords(project)]);
-  if(activeProjectId!==project)throw Error("Проект изменён");
-  state={projectId:project,userId:uid,evidence:rows.list,answers:rows.answers,notes:{},checks:{},savedRecord:null,pending:null};
+  if(activeProjectId!==project||roleAssignmentId!==assignment)throw Error("Проект или права доступа изменились");
+  state={projectId:project,userId:uid,assignmentId:roleAssignmentId,evidence:rows.list,answers:rows.answers,notes:{},checks:{},savedRecord:null,pending:null};
   readLocal();
+  const pdfs=rows.list.filter(e=>/RID-KITCHEN-VISUAL-REVIEW\.pdf$/i.test(e.objectName||""));
+  state.savedRecord=pdfs.length?{name:pdfs[pdfs.length-1].objectName,registeredAt:null}:null;
   render();
  }finally{btn.disabled=false;}
 }
@@ -402,15 +408,32 @@ function download(){
  const report=dossier();backupFile(report,"RID_KITCHEN_VISUAL_REVIEW_"+state.projectId.slice(0,12)+".json");
  status("Карта сохранена на вашем компьютере. Это не означает сохранение на сервере RID.");
 }
+async function reopenSavedPdf(){
+ if(!isProject()||!state.savedRecord?.name)throw Error("Нет подтверждённого PDF для выбранного проекта.");
+ const project=state.projectId,name=state.savedRecord.name;
+ if(!name.includes("/"+project+"/")||!/RID-KITCHEN-VISUAL-REVIEW\.pdf$/i.test(name))throw Error("Файл не соответствует выбранному проекту.");
+ const encoded=name.split("/").map(encodeURIComponent).join("/");
+ const r=await fetch(SUPABASE_ORIGIN+"/storage/v1/object/authenticated/rid-evidence/"+encoded,{headers:{apikey:cfg.publishableKey,authorization:"Bearer "+token()},cache:"no-store"});
+ if(!r.ok)throw Error("RID Storage HTTP "+r.status);
+ const blob=await r.blob();
+ if(!isProject()||state.projectId!==project)throw Error("Проект изменился во время чтения PDF.");
+ if(blob.type!=="application/pdf"||blob.size<100||blob.size>45*1024*1024)throw Error("Неожиданный формат или размер отчёта.");
+ const url=URL.createObjectURL(blob),a=mk("a");a.href=url;a.download=name.split("/").pop();document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
+ status("Сохранённый в RID PDF скачан для просмотра. Файл относится к текущему проекту.");
+}
 async function serverUser(){
  const uid=await currentUser();if(uid!==state.userId)throw Error("Сессия пользователя изменилась. Обновите проект, данные не удалены.");
  return uid;
 }
 async function register(name){
- const j=await api("/projects/"+state.projectId+"/pilot",{method:"GET",headers:{"x-role-assignment-id":roleAssignmentId}});
+ if(!isProject())throw Error("Изменился проект или назначение роли.");
+ const j=await api("/projects/"+state.projectId+"/pilot",{method:"GET",headers:{"x-role-assignment-id":state.assignmentId}});
  if(j.data?.evidence?.some(x=>x.objectName===name))return;
+ if(!isProject())throw Error("Изменился проект или назначение роли.");
  await pilotCommand("REGISTER_EVIDENCE",{objectName:name,category:"OTHER",provenance:"CUSTOMER_REPORTED",caption:"Карта наблюдений заказчика · без AI и профессионального подтверждения"});
- const verified=await api("/projects/"+state.projectId+"/pilot",{method:"GET",headers:{"x-role-assignment-id":roleAssignmentId}});
+ if(!isProject())throw Error("Изменился проект или назначение роли.");
+ const verified=await api("/projects/"+state.projectId+"/pilot",{method:"GET",headers:{"x-role-assignment-id":state.assignmentId}});
  if(!verified.data?.evidence?.some(x=>x.objectName===name))throw Error("Регистрация отчёта не подтверждена. Попробуйте ещё раз, не создавая другой проект.");
 }
 async function saveReport(){
@@ -420,11 +443,13 @@ async function saveReport(){
  saving=true;const b=$("ridDossierSend");b.disabled=true;
  try{
   const uid=await serverUser(),project=state.projectId;
+  if(!isProject())throw Error("Проект изменился. Сохранение отменено.");
   if(state.pending?.objectName){
    status("Продолжаем регистрацию ранее загруженного отчёта...");
    await register(state.pending.objectName);
    state.savedRecord={name:state.pending.objectName,registeredAt:new Date().toISOString()};
    state.pending=null;writeLocal();
+   $("ridDossierReopen").disabled=false;
    status("Карта сохранена в проекте RID. Повторно вводить наблюдения не нужно.");
    return;
   }
@@ -443,11 +468,13 @@ async function saveReport(){
    throw Error("Хранилище ответило HTTP "+res.status+": "+String(err.message||err.error||"неизвестная ошибка").slice(0,180));
   }
   state.pending={objectName:filename,createdAt:new Date().toISOString()};
+  if(!isProject())throw Error("Проект переключён. Загруженный отчёт не регистрируем в другом проекте.");
   writeLocal();status("Файл отправлен. Проверяем регистрацию в выбранном проекте...");
   await register(filename);
   state.savedRecord={name:filename,registeredAt:new Date().toISOString()};
   state.pending=null;
   writeLocal();
+  $("ridDossierReopen").disabled=false;
   status("Готово. Карта наблюдений заказчика сохранена в выбранном проекте RID. AI-анализ не выполнялся.");
  }catch(e){writeLocal();status("Не удалось подтвердить серверное сохранение: "+String(e.message||e)+". Черновик и возможность повторной регистрации сохранены.",true);}
  finally{saving=false;if(b)b.disabled=false;}
