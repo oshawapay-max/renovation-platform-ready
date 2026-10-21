@@ -60,7 +60,9 @@ function makeUI(){
  send.onclick=()=>saveReport().catch(e=>status("Отчёт не подтверждён: "+String(e.message||e),true));
  const backup=mk("button","Скачать копию карты");backup.id="ridDossierBackup";backup.type="button";backup.className="secondary";backup.disabled=true;
  backup.onclick=download;
- tools.append(load,send,backup);root.append(tools);
+ const reopen=mk("button","Открыть сохранённую PDF-карту");reopen.type="button";reopen.id="ridDossierReopen";reopen.className="secondary";reopen.disabled=true;
+ reopen.onclick=()=>reopenSavedPdf().catch(e=>status("Не удалось открыть PDF: "+String(e.message||e),true));
+ tools.append(load,send,backup,reopen);root.append(tools);
  const hint=mk("p","Выберите свой существующий проект кухни. После загрузки сохранённых материалов появятся список неопределённостей и альтернативы планировки.");
  hint.id="ridDossierStatus";hint.setAttribute("role","status");root.append(hint);
  const body=mk("div");body.id="ridDossierBody";root.append(body);
@@ -208,6 +210,7 @@ function render(){
  t.append(cb,mk("span","Я понимаю, что моя карта содержит предварительные сведения заказчика и вопросы для проверки. Я не подтверждаю безопасность конструкций, электрики или газового оборудования."));
  row.append(t);area.append(row);
  $("ridDossierSend").disabled=true;$("ridDossierBackup").disabled=false;
+ $("ridDossierReopen").disabled=!state.savedRecord?.name;
  status("Готово: анкета, "+med.length+" медиаматериалов и карта технических неопределённостей связаны в одном просмотре. Для сохранения отчёта поставьте отметку внизу.");
 }
 async function open(){
@@ -405,6 +408,20 @@ function download(){
  const report=dossier();backupFile(report,"RID_KITCHEN_VISUAL_REVIEW_"+state.projectId.slice(0,12)+".json");
  status("Карта сохранена на вашем компьютере. Это не означает сохранение на сервере RID.");
 }
+async function reopenSavedPdf(){
+ if(!isProject()||!state.savedRecord?.name)throw Error("Нет подтверждённого PDF для выбранного проекта.");
+ const project=state.projectId,name=state.savedRecord.name;
+ if(!name.includes("/"+project+"/")||!/RID-KITCHEN-VISUAL-REVIEW\.pdf$/i.test(name))throw Error("Файл не соответствует выбранному проекту.");
+ const encoded=name.split("/").map(encodeURIComponent).join("/");
+ const r=await fetch(SUPABASE_ORIGIN+"/storage/v1/object/authenticated/rid-evidence/"+encoded,{headers:{apikey:cfg.publishableKey,authorization:"Bearer "+token()},cache:"no-store"});
+ if(!r.ok)throw Error("RID Storage HTTP "+r.status);
+ const blob=await r.blob();
+ if(!isProject()||state.projectId!==project)throw Error("Проект изменился во время чтения PDF.");
+ if(blob.type!=="application/pdf"||blob.size<100||blob.size>45*1024*1024)throw Error("Неожиданный формат или размер отчёта.");
+ const url=URL.createObjectURL(blob),a=mk("a");a.href=url;a.download=name.split("/").pop();document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
+ status("Сохранённый в RID PDF скачан для просмотра. Файл относится к текущему проекту.");
+}
 async function serverUser(){
  const uid=await currentUser();if(uid!==state.userId)throw Error("Сессия пользователя изменилась. Обновите проект, данные не удалены.");
  return uid;
@@ -432,6 +449,7 @@ async function saveReport(){
    await register(state.pending.objectName);
    state.savedRecord={name:state.pending.objectName,registeredAt:new Date().toISOString()};
    state.pending=null;writeLocal();
+   $("ridDossierReopen").disabled=false;
    status("Карта сохранена в проекте RID. Повторно вводить наблюдения не нужно.");
    return;
   }
@@ -456,6 +474,7 @@ async function saveReport(){
   state.savedRecord={name:filename,registeredAt:new Date().toISOString()};
   state.pending=null;
   writeLocal();
+  $("ridDossierReopen").disabled=false;
   status("Готово. Карта наблюдений заказчика сохранена в выбранном проекте RID. AI-анализ не выполнялся.");
  }catch(e){writeLocal();status("Не удалось подтвердить серверное сохранение: "+String(e.message||e)+". Черновик и возможность повторной регистрации сохранены.",true);}
  finally{saving=false;if(b)b.disabled=false;}
