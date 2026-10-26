@@ -1,0 +1,1296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RID Kitchen Pilot Workspace</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;color:#151515;background:#f4f4f2}
+*{box-sizing:border-box} body{margin:0} header{background:#171717;color:white;padding:16px 22px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+header strong{font-size:20px} header small{opacity:.72}
+main{max-width:1180px;margin:auto;padding:18px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:white;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:16px}
+h2{margin:0 0 12px;font-size:18px} h3{margin:16px 0 8px;font-size:15px}
+label{display:block;font-size:13px;font-weight:700;margin:10px 0 5px}input,select,textarea,button{font:inherit}
+input,select,textarea{width:100%;padding:9px;border:1px solid #bbb;border-radius:7px;background:white}textarea{min-height:90px}
+button{padding:9px 13px;border:0;border-radius:7px;background:#202020;color:white;cursor:pointer;margin:4px 4px 4px 0}button.secondary{background:#666}button.warn{background:#8a4b00}button:disabled{opacity:.45;cursor:not-allowed}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#e9e9e7;font-size:12px;margin:2px}.good{background:#e1f4e6}.risk{background:#ffe3d5}.sim{background:#fff0b8}
+pre{white-space:pre-wrap;background:#f7f7f5;padding:10px;border-radius:8px;max-height:280px;overflow:auto;font-size:12px}.muted{color:#666;font-size:13px}.status{padding:9px;border-radius:7px;background:#efefec;margin-bottom:12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hidden{display:none!important}.full{grid-column:1/-1}
+hr{border:0;border-top:1px solid #e1e1de;margin:16px 0}.field{border-top:1px solid #eee;padding-top:8px}.danger-note{border-left:4px solid #b76b00;padding:8px 10px;background:#fff6e8;font-size:13px}
+@media(max-width:800px){.grid,.row{grid-template-columns:1fr} header{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+<div><strong>RID Kitchen Pilot Workspace</strong><br><small>REAL CUSTOMER / REAL KITCHEN / EXPLICIT SHADOW ROLES / NO FABRICATED AUTHORITY</small></div>
+<div id="topState"><span class="badge sim">Pilot preparation</span></div>
+</header>
+<main>
+<div id="notice" class="status">Loading pilot configuration…</div>
+<div class="danger-note"><strong>FIRST PILOT MODE:</strong> use real Customer/property/site data and evidence. Missing Expert/C03/Contractor/Inspector/AHJ/Supplier/Finance nodes are handled only through shadow roles or SIMULATED_EXTERNAL_EFFECT. Sections marked LATER / FULL E2E are not required for the first Kitchen pilot.</div>
+
+<section id="loginCard" class="card">
+<h2>RID sign in</h2>
+<p class="muted">Use your existing RID account. Password is sent directly to Supabase Auth and is not stored by this pilot UI.</p>
+<div class="row">
+<div><label>Email</label><input id="email" type="email" autocomplete="username"></div>
+<div><label>Password</label><input id="password" type="password" autocomplete="current-password"></div>
+</div>
+<button id="loginBtn">Sign in</button>
+</section>
+
+<div id="app" class="hidden">
+<div class="grid">
+<section class="card">
+<h2>1. Project entry</h2>
+<div id="identity"></div>
+<div id="pendingInvites"></div>
+<button id="refreshEntry">Refresh</button>
+<h3>Existing RID projects</h3>
+<p class="danger-note">Historical development / stress-test / E2E projects are not eligible as pilot targets. Create a new clean Property and a new Kitchen pilot project below.</p>
+<div id="projects"></div>
+<hr>
+<h3>Create clean pilot portfolio</h3>
+<label>Portfolio name</label><input id="portfolioName" value="RID Pilot Workspace">
+<button id="createPortfolio">Create portfolio</button>
+<hr>
+<h3>Add real property</h3>
+<label>Portfolio</label><select id="propertyPortfolio"></select>
+<div class="row">
+<div><label>Property display name</label><input id="propertyName" required placeholder="Enter the real property label"></div>
+<div><label>Property type (optional)</label><select id="propertyType"><option value="">Unknown / not entered</option><option value="DETACHED_HOUSE">Detached house</option><option value="SEMI_DETACHED_HOUSE">Semi-detached house</option><option value="TOWNHOUSE">Townhouse</option><option value="CONDO">Condo</option><option value="">Other / unknown</option></select></div>
+</div>
+<div class="row">
+<div><label>City</label><input id="city"></div>
+<div><label>Province / state (optional)</label><input id="province"></div>
+<div><label>Country (optional)</label><input id="country" placeholder="e.g. CA"></div>
+</div>
+<label>Street/address (optional at this stage)</label><input id="street">
+<button id="addProperty">Add property</button>
+<hr>
+<h3>Start clean pilot project</h3>
+<label>Domain</label><select id="projectDomain" disabled><option value="KITCHEN" selected>Kitchen</option></select>
+<label>Property</label><select id="projectProperty"></select>
+<label>Program name</label><input id="programName" value="RID Pilot">
+<button id="startProject">Start pilot project</button>
+</section>
+
+<section class="card">
+<h2>2. Active project</h2>
+<div id="activeProject" class="muted">No project selected.</div>
+<button id="loadWorkspace" disabled>Load workspace</button>
+<button id="loadJourney" disabled>Show authoritative next action</button>
+<button id="initPilot" disabled>Initialize shadow pilot</button>
+<div id="workspaceSummary"></div>
+<div id="roleInbox" class="status">Role inbox will appear after pilot initialization.</div>
+<hr>
+<h3>Active pilot role</h3>
+<select id="shadowRole">
+<option>CUSTOMER</option><option>RID_OPERATOR</option><option>EXPERT_ASSESSOR_SIMULATION</option>
+<option>SPACE_PLANNER</option><option>DESIGNER_ENGINEER_SIMULATION</option>
+<option>CONTRACTOR_SUPERVISOR_SIMULATION</option><option>CONTRACTOR_TRADE_SIMULATION</option>
+<option>CONSTRUCTOR_SIMULATION</option><option>INSPECTOR_VERIFIER_SIMULATION</option>
+<option>SUPPLIER_SIMULATION</option><option>FINANCE_PAYMENT_SIMULATION</option><option>EXTERNAL_AHJ_SIMULATION</option>
+</select>
+<button id="setRole" disabled>Switch view</button>
+<div class="danger-note">Shadow-role switching changes only the pilot view. It does not create participant assignment, professional competence, permit authority, inspection authority or payment authority.</div>
+</section>
+
+<section class="card">
+<h2>3. Customer Intent</h2>
+<label>Primary intent</label>
+<select id="primaryIntent">
+<option>INTENT_KITCHEN_RENEWAL</option>
+<option>INTENT_LAYOUT_RECONFIGURATION</option>
+<option>INTENT_FAMILY_COOKING</option>
+<option>INTENT_ENTERTAINING</option>
+<option>INTENT_STORAGE_OPTIMIZATION</option>
+<option>INTENT_APPLIANCE_UPGRADE</option>
+<option>INTENT_ACCESSIBILITY</option>
+<option>INTENT_INDOOR_ENVIRONMENT</option>
+<option>INTENT_DAMAGE_OR_DEFECT_REMEDIATION</option>
+<option>INTENT_MIXED_USE</option>
+<option>INTENT_PANTRY</option>
+<option>INTENT_BAKING_AND_PREPARATION</option>
+<option>INTENT_BEVERAGE_STATION</option>
+<option>INTENT_SINK_AND_WATER_FIXTURES</option>
+</select>
+<label>Secondary intents (optional)</label>
+<select id="secondaryIntents" multiple size="7">
+<option>INTENT_KITCHEN_RENEWAL</option>
+<option>INTENT_LAYOUT_RECONFIGURATION</option>
+<option>INTENT_FAMILY_COOKING</option>
+<option>INTENT_ENTERTAINING</option>
+<option>INTENT_STORAGE_OPTIMIZATION</option>
+<option>INTENT_APPLIANCE_UPGRADE</option>
+<option>INTENT_ACCESSIBILITY</option>
+<option>INTENT_INDOOR_ENVIRONMENT</option>
+<option>INTENT_DAMAGE_OR_DEFECT_REMEDIATION</option>
+<option>INTENT_MIXED_USE</option>
+<option>INTENT_PANTRY</option>
+<option>INTENT_BAKING_AND_PREPARATION</option>
+<option>INTENT_BEVERAGE_STATION</option>
+<option>INTENT_SINK_AND_WATER_FIXTURES</option>
+</select>
+<div class="muted">Choose only additional project goals. RID removes the primary intent from the secondary set and deduplicates repeated selections.</div>
+<button id="selectIntent" disabled>Create intent set</button>
+<button id="updateIntentDraft" disabled>Update draft intent set</button>
+<label>Reason for changing a confirmed intent</label>
+<input id="intentChangeReason" placeholder="What changed in the customer's project goals?">
+<div class="danger-note">Changing a confirmed intent before Project Input Baseline creates a new intent revision. RID keeps prior history and still-valid C02 field facts/evidence, but the current Preliminary Input, preliminary estimate, preliminary regulatory screening, customer preliminary decision and current C03 binding are no longer current and must be rebuilt from the revised intent. After Project Input Baseline, this shortcut is blocked and the governed rebaseline/change path is required.</div>
+<button id="reviseIntent" disabled>Revise confirmed intent before baseline</button>
+<button id="confirmIntent" disabled>Confirm selected intent</button>
+<div id="intentStatus" class="muted"></div>
+</section>
+
+<section class="card">
+<h2>4. Preliminary Input</h2>
+<p class="muted">Unknown is valid. RID must not turn missing information into an assumed fact.</p>
+<button id="loadPrelim" disabled>Load domain intake fields</button>
+<div id="prelimProgress" class="status">Customer definition</div>
+<div id="prelimFields"></div>
+<div id="prelimEvidenceGoals" class="muted"></div>
+<div id="prelimMediaFollowups" class="muted"></div>
+<button id="previewPrelim" disabled>Preview</button>
+<button id="submitPrelim" disabled>Submit customer-reported input</button>
+<div id="prelimResult"></div>
+</section>
+
+<section class="card full">
+<h2>4B. LATER / FULL E2E — Real C02 + C03 participant path</h2>
+<p class="muted">Not required for the first controlled shadow pilot. Retained for the later authenticated multi-role E2E. The first pilot uses EXPERT_ASSESSOR_SIMULATION and SPACE_PLANNER shadow views while preserving all real authority boundaries.</p>
+<button id="loadC03" disabled>Load C03 / visit status</button>
+<div id="c03Status" class="status">C03 status not loaded.</div>
+<div class="row">
+<div>
+<h3>Customer / Owner</h3>
+<label>Specialist email</label><input id="c03InviteEmail" type="email">
+<label>Display name</label><input id="c03InviteName">
+<button id="inviteC03" disabled>Invite C03 specialist</button>
+</div>
+<div>
+<h3>Planning specialist</h3>
+<div id="c03Prompts"><p class="muted">Load C03 status.</p></div>
+<button id="submitC03" disabled>Submit C03 enrichment</button>
+</div>
+</div>
+<div id="c03Visit" class="muted"></div>
+</section>
+
+<section class="card full">
+<h2>4C. LATER / FULL E2E — Real C02 Technical Field Capture</h2>
+<p class="muted">Not required for the first controlled shadow pilot. This is the authoritative T2 Assessment surface backed by rid-project-assessment. Reused facts remain evidence-backed prior observations; only new or unverified topics require new field capture. C02 authority is observe / measure / document only.</p>
+<button id="loadRealAssessment" disabled>Load real C02 workspace</button>
+<div id="realAssessmentStatus" class="status">Real C02 workspace not loaded.</div>
+<div id="realAssessmentQuestions"></div>
+<div id="realAssessmentReuseReview"></div>
+<div class="row">
+<div>
+<button id="startRealAssessment" disabled>Start real assessment</button>
+<button id="submitRealAssessment" disabled>Submit real assessment</button>
+</div>
+<div>
+<label>Existing expert role assignment ID (owner preparation only)</label>
+<input id="realAssessmentExpertRole" placeholder="Existing active Assessment Expert role assignment">
+<button id="prepareRealAssessment" disabled>Prepare / refresh supplemental assessment</button>
+</div>
+</div>
+</section>
+
+
+<section class="card full">
+<h2>4D. LATER / FULL E2E — Governed lifecycle to Approved Baseline</h2>
+<p class="muted">Not required for the first controlled shadow pilot. This console calls only authoritative project-scoped surfaces. Role, assignment, capability, evidence, stage and currentness checks remain server-side.</p>
+<button id="loadGovernedLifecycle" disabled>Load governed T2 / T3 state</button>
+<div id="governedLifecycleStatus" class="status">Governed lifecycle not loaded.</div>
+
+<div class="row">
+<div>
+<h3>RID capability verification</h3>
+<p class="muted">Verification records qualification/competence evidence only. It does not enroll or assign the participant.</p>
+<label>Target verified account email</label><input id="capTargetEmail" type="email">
+<label>Participant type</label><select id="capParticipantType"><option>DESIGNER</option><option>DESIGN_AUTHORITY</option><option>PROFESSIONAL</option><option>ENGINEER</option><option>REGULATED_PROFESSIONAL</option><option>ARCHITECT</option><option>PROJECT_PLANNING_SPACE_DESIGN_SPECIALIST</option><option>ASSESSMENT_EXPERT</option><option>TECHNICAL_EXPERT</option></select>
+<label>Domain code</label><input id="capDomainCode" value="KITCHEN">
+<label>Capability code</label><input id="capCapabilityCode" value="T45_DESIGN_CONFIGURATION">
+<label>Qualification refs (comma separated)</label><input id="capQualificationRefs" placeholder="registry://..., credential://...">
+<label>Verification evidence refs (comma separated)</label><input id="capEvidenceRefs" placeholder="evidence://...">
+<label>Authority source ref</label><input id="capAuthoritySourceRef" placeholder="authority://...">
+<label>Effective to (optional YYYY-MM-DD)</label><input id="capEffectiveTo">
+<button id="verifyCapability" disabled>Verify capability profile</button>
+<hr>
+<h4>Pre-assignment onboarding screening</h4>
+<p class="muted">RID operator only. These checks establish assignment eligibility; they do not enroll or assign the participant.</p>
+<label>Screening check</label><select id="onboardingCheckType"><option>IDENTITY_VERIFICATION</option><option>ACCESS_RISK_ACKNOWLEDGEMENT</option><option>POLICE_RECORD_CHECK</option><option>REFERENCE_CHECK</option></select>
+<label>Verification method</label><input id="onboardingVerificationMethod" value="RID_PILOT_VERIFICATION">
+<label>Evidence refs (comma separated)</label><input id="onboardingEvidenceRefs" placeholder="evidence://...">
+<label>Authority source ref</label><input id="onboardingAuthoritySourceRef" placeholder="authority://...">
+<label>Consent ref (required for police-record check)</label><input id="onboardingConsentRef" placeholder="consent://...">
+<label>Result note</label><input id="onboardingResultNote" placeholder="Verification summary">
+<button id="verifyOnboardingScreening" disabled>Record onboarding screening</button>
+</div>
+<div>
+<h3>Owner participant invitations</h3>
+<label>Designer email</label><input id="designInviteEmail" type="email">
+<label>Designer display name</label><input id="designInviteName">
+<label>Designer role assignment ID</label><input id="designInviteRoleId" placeholder="pilot-designer-001">
+<label>Design participant role</label><select id="designInviteRole"><option>DESIGNER</option><option>DESIGN_AUTHORITY</option></select>
+<button id="createDesignInvite" disabled>Create Design invitation</button>
+<hr>
+<label>Professional email</label><input id="professionalInviteEmail" type="email">
+<label>Professional display name</label><input id="professionalInviteName">
+<label>Professional role assignment ID</label><input id="professionalInviteRoleId" placeholder="pilot-professional-001">
+<label>Professional role</label><select id="professionalInviteRole"><option>REGULATED_PROFESSIONAL</option><option>PROFESSIONAL</option><option>ENGINEER</option><option>ARCHITECT</option></select>
+<label>Required qualification refs (comma separated)</label><input id="professionalInviteQualifications">
+<button id="createProfessionalInvite" disabled>Create Professional invitation</button>
+</div>
+</div>
+<div class="row">
+<div>
+<h3>T2 / T3</h3>
+<button id="confirmFactualReview" disabled>Confirm customer factual review</button>
+<button id="issueInputBaseline" disabled>Issue Project Input Baseline</button>
+<button id="runT3Readiness" disabled>Run / refresh T3 readiness</button>
+<label>T3 governed command</label>
+<select id="t3Command"><option>ASSIGN_T3_VERIFIER</option><option>RESOLVE_T3_DEPENDENCY</option></select>
+<label>Payload JSON (without type)</label>
+<textarea id="t3Payload">{}</textarea>
+<button id="runT3Command" disabled>Run T3 command</button>
+</div>
+<div>
+<h3>T45 / T5</h3>
+<button id="loadT45" disabled>Load real T45 workspace</button>
+<div id="t45Status" class="status">T45 workspace not loaded.</div>
+<label>T45 command</label>
+<select id="t45Command">
+<option>PROPOSE_DESIGN_ASSIGNMENT</option>
+<option>ACCEPT_DESIGN_ASSIGNMENT</option>
+<option>DECLINE_DESIGN_ASSIGNMENT</option>
+<option>VERIFY_DESIGN_ASSIGNMENT_AUTHORITY</option>
+<option>ACTIVATE_DESIGN_ASSIGNMENT</option>
+<option>CREATE_CONFIGURATION_CANDIDATE</option>
+<option>RECORD_PROJECT_DEVELOPMENT_OPTION_SET</option>
+<option>CUSTOMER_PROJECT_DECISION</option>
+<option>REVISE_CONFIGURATION_CANDIDATE</option>
+<option>ATTACH_BASELINE_REQUIREMENTS</option>
+<option>SUBMIT_CONFIGURATION_CANDIDATE_FOR_APPROVAL</option>
+</select>
+<label>Payload JSON (without type)</label>
+<textarea id="t45Payload">{}</textarea>
+<button id="runT45Command" disabled>Run governed T45 command</button>
+</div>
+</div>
+<div class="row">
+<div>
+<h3>Actor approval</h3>
+<label>Payload JSON</label>
+<textarea id="t5ApprovalPayload">{"configurationCandidateId":"","dimension":"CUSTOMER_FUNCTIONAL_COMMERCIAL","decision":"APPROVED","evidenceRefs":["pilot://approval-evidence"],"conditions":[]}</textarea>
+<button id="runT5Approval" disabled>Record actor approval</button>
+</div>
+<div>
+<h3>Approved Baseline</h3>
+<label>Payload JSON</label>
+<textarea id="t5BaselinePayload">{"configurationCandidateId":""}</textarea>
+<button id="runT5Baseline" disabled>Issue Approved Baseline</button>
+</div>
+</div>
+<div id="governedLifecycleResult"></div>
+</section>
+
+<section class="card">
+<h2>5. Real evidence / photos</h2>
+<label>Evidence category</label>
+<select id="evidenceCategory">
+<option>ROOM_OVERVIEW</option><option>WALL</option><option>PLUMBING_SINK</option>
+<option>ELECTRICAL_PANEL</option><option>ELECTRICAL_ROOM</option><option>RANGE_VENTILATION</option>
+<option>FLOOR</option><option>CEILING</option><option>CABINETRY</option><option>APPLIANCE</option>
+<option>MEASUREMENT</option><option>UNKNOWN_CONDITION</option><option>OTHER</option>
+</select>
+<label>Provenance</label><select id="evidenceProvenance"><option>REAL_OBSERVED</option><option>CUSTOMER_REPORTED</option><option>UNKNOWN</option></select>
+<label>Photo / video / file</label><input id="evidenceFile" type="file" accept="image/*,video/*" capture="environment">
+<label>Caption</label><input id="evidenceCaption" placeholder="What this image shows">
+<button id="uploadEvidence" disabled>Upload and register evidence</button>
+<button id="reviewPilotMedia" class="secondary" disabled>Review photo/video coverage</button>
+<div id="evidenceStatus"></div>
+<div id="pilotMediaReview" class="status">No media coverage review in this session.</div>
+<hr>
+<h3>Ask RID during the pilot</h3>
+<p class="muted">Describe what you want, ask what to measure, or ask what photo/video would reduce uncertainty. The assistant is advisory and cannot approve, diagnose, release work or change project authority.</p>
+<textarea id="pilotAiMessage" placeholder="Example: What should I show or measure next?"></textarea>
+<button id="sendPilotAiMessage" class="secondary" disabled>Ask RID</button>
+<div id="pilotAiConversation" class="status">No pilot assistant messages yet.</div>
+</section>
+
+<section class="card">
+<h2>6. External simulation console</h2>
+<label>External node</label>
+<select id="externalType">
+<option>MARKET_PRICING</option><option>STRUCTURAL_REVIEW</option><option>ELECTRICAL_REVIEW</option>
+<option>PLUMBING_REVIEW</option><option>HVAC_REVIEW</option><option>BUILDING_CONDITION_REVIEW</option>
+<option>APPLIANCE_SERVICE_REVIEW</option><option>MOISTURE_REVIEW</option><option>FOUNDATION_REVIEW</option>
+<option>EGRESS_REVIEW</option><option>FIRE_REVIEW</option><option>SPECIALIST_REVIEW</option>
+<option>PERMIT_AHJ</option><option>SUPPLIER</option><option>CONTRACTOR_QUOTE</option><option>FINANCE</option>
+<option>PAYMENT_PROVIDER</option><option>INSPECTION</option>
+</select>
+<label>Simulated outcome</label><textarea id="externalOutcome" placeholder="Explicitly simulated result"></textarea>
+<button id="recordExternal" disabled>Record SIMULATED_EXTERNAL_EFFECT</button>
+<div id="externalStatus"></div>
+</section>
+
+
+<section class="card">
+<h2>7. Customer preliminary concept - NOT FOR CONSTRUCTION</h2><div id="conceptStatus" class="status">Load project</div><div id="conceptGraphic"></div><button id="buildCustomerConcept" disabled>Build functional concept</button><button id="reviseCustomerConcept" disabled>Request revision</button><button id="acceptCustomerConcept" disabled>Accept for expert review</button><button id="deferCustomerConcept" disabled>Defer</button><input id="conceptDecisionNote" placeholder="Optional note"><h2>7. Front-half readiness / controlled shadow bridge</h2>
+<p class="muted">Authoritative T1 remains governed by verified market calibration. For the first controlled shadow pilot only, a clearly marked MARKET_PRICING simulated context may support a separate shadow customer decision without creating or approving a real preliminary estimate.</p>
+<button id="viewEstimate" disabled>View estimate calculation</button>
+<button id="issueEstimate" disabled>Issue preliminary estimate</button>
+<button id="viewReview" disabled>View regulatory/proceed review</button>
+<button id="completeScreening" disabled>Complete preliminary screening</button>
+<label>Customer decision</label>
+<select id="customerDecision"><option>PROCEED_TO_EXPERT</option><option>DEFER</option><option>STOP</option></select>
+<label>Decision note (optional)</label><input id="customerDecisionNote" placeholder="Pilot decision context">
+<button id="recordDecision" disabled>Record authoritative customer decision</button>
+<hr>
+<h3>Controlled shadow T1 bridge</h3>
+<p class="danger-note">Use only when authoritative T1 is blocked by real market calibration. First record MARKET_PRICING in External Simulation Console, switch shadow role to CUSTOMER, then record the shadow decision. This does not satisfy market governance.</p>
+<select id="shadowPrelimDecision"><option>PROCEED_TO_SHADOW_ASSESSMENT</option><option>REVISE_CUSTOMER_INPUT</option><option>STOP_SHADOW_PILOT</option></select>
+<label>Shadow decision note</label><input id="shadowPrelimNote" placeholder="Why the customer would proceed in this simulated pricing context">
+<button id="recordShadowPrelimDecision" disabled>Record shadow preliminary decision</button>
+<div id="shadowPrelimStatus" class="status">No shadow preliminary decision recorded.</div>
+<div id="frontHalfResult"></div>
+</section>
+
+<section class="card full">
+<h2>8. Controlled Shadow — Assessment simulation</h2>
+<p class="muted">This is the accepted first-pilot lane when no external assessor participates. It uses real customer/site information where available, preserves UNKNOWN, and never satisfies real professional competence or regulatory authority.</p>
+<button id="startShadowAssessment" disabled>Start shadow assessment</button>
+<div id="shadowAssessment"></div>
+<button id="completeShadowAssessment" disabled>Complete shadow assessment</button>
+</section>
+
+<section class="card full">
+<h2>9. Controlled Shadow — Functional planning / derived options</h2>
+<p class="muted">This simulation no longer asks the customer or planning specialist to repeat project requirements. RID derives the shadow option inputs from the current real Preliminary Project and, when C03 is required, the current revision-bound C03 Owner Requirements contribution. The resulting options remain simulation-only and are not a design approval, Project Input Baseline, professional release, or construction authorization.</p>
+<button id="startFunctionalPlanning" disabled>Create downstream shadow options from real project formation</button>
+<div id="functionalPlanning"></div>
+</section>
+
+<section class="card full">
+<h2>10. Controlled Shadow — Design / Execution / Change / Closeout</h2>
+<p class="muted">This is the accepted first-pilot continuation lane when external contractor, inspector, AHJ, supplier, finance or regulated-professional nodes are absent. Every simulated result remains explicitly non-authoritative and cannot become a real approval, payment, permit, inspection or construction release.</p>
+<div class="row">
+<div>
+<button id="createDesignHandoff" disabled>Create shadow design handoff</button>
+<button id="refreshDesignDeps" disabled>Refresh simulated dependencies</button>
+<button id="createWorkPackages" disabled>Create shadow work packages</button>
+<button id="startShadowExecution" disabled>Start shadow execution</button>
+<button id="refreshExecutionDeps" disabled>Refresh shadow dependency holds</button>
+</div>
+<div>
+<label>Work package</label><select id="shadowWorkPackage"></select>
+<label>Evidence IDs (comma separated)</label><input id="shadowExecEvidence">
+</div>
+</div>
+<hr>
+<h3>Hidden condition → Change Request</h3>
+<label>Observed hidden condition</label><textarea id="hiddenCondition" placeholder="Record the actual discovered condition; use real evidence refs where available"></textarea>
+<button id="recordHiddenCondition" disabled>Record hidden condition & hold package</button>
+<label>Change description</label><textarea id="crDescription"></textarea>
+<div class="row">
+<div><label>Scope impact</label><textarea id="crScopeImpact"></textarea></div>
+<div><label>Cost / schedule impact</label><input id="crCostImpact" placeholder="UNKNOWN or reference range"><input id="crScheduleImpact" placeholder="UNKNOWN or time impact"></div>
+</div>
+<button id="createShadowCR" disabled>Create shadow Change Request</button>
+<label>Change Request</label><select id="shadowCR"></select>
+<select id="shadowCRDecision"><option>APPROVE_SHADOW_REVISION</option><option>DEFER</option><option>REJECT</option></select>
+<button id="decideShadowCR" disabled>Record customer CR decision</button>
+<button id="applyShadowCR" disabled>Apply superseding shadow revision</button>
+<hr>
+<h3>Completion / Inspection / Acceptance</h3>
+<label>Completion note</label><input id="completionNote">
+<button id="recordShadowCompletion" disabled>Submit shadow completion evidence</button>
+<label>Simulated inspection result</label><select id="inspectionDecision"><option>PASS_SIMULATED</option><option>CORRECTION_REQUIRED</option><option>INSUFFICIENT_EVIDENCE</option></select>
+<label>Inspection note</label><input id="inspectionNote">
+<button id="recordShadowInspection" disabled>Record simulated inspection</button>
+<div class="row">
+<div><label>Customer acceptance</label><select id="shadowAcceptance"><option>ACCEPTED</option><option>REJECTED</option></select></div>
+<div><label>Acceptance note</label><input id="acceptanceNote"></div>
+</div>
+<button id="recordShadowAcceptance" disabled>Record customer acceptance</button>
+<button id="issueShadowRFU" disabled>Issue READY_FOR_USE_SHADOW</button>
+<div id="shadowExecution"></div>
+</section>
+<section class="card full">
+<h2>Diagnostics</h2>
+<pre id="diag">No data yet.</pre>
+</section>
+</div>
+</div>
+</main>
+<script>
+const UI_BASE = '';
+let cfg=null, auth=null, entry=null, activeProjectId=null, activeDomain='KITCHEN', workspace=null, roleAssignmentId=null;
+const DOMAIN_INTENTS={
+ KITCHEN:['INTENT_KITCHEN_RENEWAL','INTENT_LAYOUT_RECONFIGURATION','INTENT_FAMILY_COOKING','INTENT_ENTERTAINING','INTENT_STORAGE_OPTIMIZATION','INTENT_APPLIANCE_UPGRADE','INTENT_ACCESSIBILITY','INTENT_INDOOR_ENVIRONMENT','INTENT_DAMAGE_OR_DEFECT_REMEDIATION','INTENT_MIXED_USE','INTENT_PANTRY','INTENT_BAKING_AND_PREPARATION','INTENT_BEVERAGE_STATION','INTENT_SINK_AND_WATER_FIXTURES']
+};
+function renderDomainIntents(){
+ const xs=DOMAIN_INTENTS[activeDomain]||[];
+ $('primaryIntent').innerHTML=xs.map(x=>'<option>'+escapeHtml(x)+'</option>').join('');
+ $('secondaryIntents').innerHTML=xs.map(x=>'<option>'+escapeHtml(x)+'</option>').join('');
+ $('projectDomain').value=activeDomain;
+}
+let lastIntentPackageId=null, prelimSchema=null, realAssessmentData=null, prelimSelectedFollowupIds=new Set();
+
+const $=id=>document.getElementById(id);
+function say(msg,kind=''){
+  if(msg==='PRELIMINARY_INPUT_REGENERATION_REQUIRED'&&activeProjectId){
+    $('notice').textContent='This project was created with an older Preliminary Input contract. Load C01 Preliminary Input, review the carried/current answers, preview the current tree, then submit a fresh Preliminary Input before starting C03.';
+    $('notice').className='status risk';
+    return;
+  }
+  if(['REVISION_CONFLICT','CONFLICT'].includes(msg)&&activeProjectId){
+    $('notice').textContent='This project changed in another action or browser tab. Refreshing the current project state…';
+    $('notice').className='status risk';
+    queueMicrotask(async()=>{
+      try{
+        await loadWorkspace();
+        if(typeof governedLifecycleData!=='undefined'&&governedLifecycleData)await loadGovernedLifecycle(false);
+        if(typeof t45LifecycleData!=='undefined'&&t45LifecycleData)await loadT45(false);
+        $('notice').textContent='Project state refreshed. Review the current values and repeat the action only if it is still needed.';
+        $('notice').className='status good';
+      }catch{}
+    });
+    return;
+  }
+  $('notice').textContent=msg; $('notice').className='status '+kind;
+}
+function diag(x){ $('diag').textContent=typeof x==='string'?x:JSON.stringify(x,null,2); }
+function token(){ return auth?.access_token || sessionStorage.getItem('ridPilotAccess') || ''; }
+function headers(extra={}){ return {authorization:'Bearer '+token(), 'content-type':'application/json', ...extra}; }
+function idem(prefix){ return prefix+'-'+crypto.randomUUID(); }
+function corr(){ return 'pilot-'+crypto.randomUUID(); }
+
+async function api(path,opts={}){
+  const r=await fetch(UI_BASE+'/api'+path,{...opts,headers:{...headers(),...(opts.headers||{})}});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.code||j.msg||('HTTP '+r.status));
+  return j;
+}
+async function loadConfig(){
+  const r=await fetch(UI_BASE+'/config'); cfg=await r.json();
+  const stored=sessionStorage.getItem('ridPilotAccess');
+  if(stored){ auth={access_token:stored,refresh_token:sessionStorage.getItem('ridPilotRefresh')}; await enter().catch(()=>logout()); }
+  else say('Pilot Workspace ready. Sign in with the existing RID account.','good');
+}
+async function login(){
+  say('Signing in…');
+  const r=await fetch('/auth/v1/token?grant_type=password',{
+    method:'POST',headers:{apikey:cfg.publishableKey,'content-type':'application/json'},
+    body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})
+  });
+  const j=await r.json(); if(!r.ok) throw new Error(j.msg||j.error_description||'LOGIN_FAILED');
+  auth=j; sessionStorage.setItem('ridPilotAccess',j.access_token); if(j.refresh_token)sessionStorage.setItem('ridPilotRefresh',j.refresh_token);
+  $('password').value=''; await enter();
+}
+function logout(){ auth=null;sessionStorage.removeItem('ridPilotAccess');sessionStorage.removeItem('ridPilotRefresh');$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');say('Signed out or session expired.');}
+async function enter(){ $('loginCard').classList.add('hidden');$('app').classList.remove('hidden');await refreshEntry();say('Authenticated. RID Pilot Workspace is active.','good');}
+
+async function refreshEntry(){
+  const j=await api('/project-entry',{method:'GET'}); entry=j.data; renderEntry(); diag(j);
+}
+function renderEntry(){
+  $('identity').innerHTML='<span class="badge good">Supabase Auth verified</span> <span class="badge">Pending invites: '+(entry.pendingProjectInvitationCount||0)+'</span>';
+  const invites=(entry.pendingProjectInvitations||[]);
+  $('pendingInvites').innerHTML=invites.length?'<h3>Pending project invitations</h3>'+invites.map(inv=>'<div class="field"><strong>'+escapeHtml(inv.invitationType)+'</strong> · '+escapeHtml(inv.projectId)+' · '+escapeHtml(inv.displayName||inv.role||'')+(inv.invitationType==='C03'?'<br><button class="accept-c03-invite" data-project="'+escapeHtml(inv.projectId)+'" data-invite="'+escapeHtml(inv.inviteId)+'" data-rev="'+escapeHtml(inv.revision)+'">Accept C03 invitation</button><button class="secondary decline-c03-invite" data-project="'+escapeHtml(inv.projectId)+'" data-invite="'+escapeHtml(inv.inviteId)+'" data-rev="'+escapeHtml(inv.revision)+'">Decline</button>':(['DESIGN','PROFESSIONAL'].includes(inv.invitationType)?'<br><button class="accept-enrollment-invite" data-kind="'+escapeHtml(inv.invitationType)+'" data-project="'+escapeHtml(inv.projectId)+'" data-invite="'+escapeHtml(inv.inviteId)+'">Accept '+escapeHtml(inv.invitationType)+' invitation</button>':'<br><span class="muted">Use '+escapeHtml(inv.acceptanceSurface||'assigned enrollment')+'.</span>'))+'</div>').join(''):'';
+  document.querySelectorAll('.accept-c03-invite').forEach(b=>b.onclick=()=>respondC03Invite(b.dataset.project,b.dataset.invite,Number(b.dataset.rev),'ACCEPT_C03_INVITE'));
+  document.querySelectorAll('.decline-c03-invite').forEach(b=>b.onclick=()=>respondC03Invite(b.dataset.project,b.dataset.invite,Number(b.dataset.rev),'DECLINE_C03_INVITE'));
+  document.querySelectorAll('.accept-enrollment-invite').forEach(b=>b.onclick=()=>acceptEnrollmentInvite(b.dataset.kind,b.dataset.project,b.dataset.invite).catch(e=>say(e.message,'risk')));
+
+  const owned=(entry.projects||[]).map(p=>({...p,entrySource:'OWNER'}));
+  const participant=(entry.participantProjects||[]).map(p=>({...p,domainCodes:[p.domainCode],entrySource:'PARTICIPANT'}));
+  const seen=new Set();
+  const allProjects=[...owned,...participant].filter(p=>{if(seen.has(p.projectId))return false;seen.add(p.projectId);return true});
+  const eligible=allProjects.filter(p=>p.projectId==='rid-b993bbf55aff4ac6819dc7092e56c0f6'&&(p.domainCodes||[]).map(x=>String(x).toUpperCase()).includes('KITCHEN')&&!/(^|[-_])(dev|test|stress|e2e|fixture|synthetic)([-_]|$)/i.test(String(p.projectId||'')));
+  const excluded=allProjects.length-eligible.length;
+  $('projects').innerHTML=eligible.map(p=>'<button class="secondary proj" data-id="'+p.projectId+'">'+p.projectId+' · '+escapeHtml(((p.domainCodes||[])[0]||p.domainCode||''))+' · '+escapeHtml(p.entrySource||'')+'</button>').join('') || '<span class="muted">No eligible clean Kitchen pilot project yet.</span>';
+  if(excluded>0)$('projects').innerHTML+='<p class="muted">'+excluded+' historical/non-Kitchen project(s) hidden from pilot selection.</p>';
+  document.querySelectorAll('.proj').forEach(b=>b.onclick=()=>selectProject(b.dataset.id));
+  const portfolios=(entry.portfolios||[]);
+  $('propertyPortfolio').innerHTML=portfolios.map(x=>'<option value="'+x.portfolioId+'">'+escapeHtml(x.portfolioName)+'</option>').join('');
+  const props=(entry.properties||[]);
+  $('projectProperty').innerHTML=props.map(x=>'<option value="'+x.propertyId+'">'+escapeHtml(x.displayName)+'</option>').join('');
+}
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+async function entryCommand(command,payload){
+  const j=await api('/project-entry/commands',{method:'POST',body:JSON.stringify({command,payload})}); await refreshEntry(); return j;
+}
+async function respondC03Invite(projectId,inviteId,revision,command){
+  const j=await api('/projects/'+projectId+'/c03-assignment/commands',{
+    method:'POST',
+    headers:{'if-match':String(revision),'idempotency-key':idem('c03-invite-response'),'x-correlation-id':corr()},
+    body:JSON.stringify({command,payload:{inviteId}})
+  });
+  await refreshEntry();diag(j);say(command==='ACCEPT_C03_INVITE'?'C03 invitation accepted.':'C03 invitation declined.','good');
+}
+async function acceptEnrollmentInvite(kind,projectId,inviteId){
+  const design=kind==='DESIGN';
+  if(!design&&kind!=='PROFESSIONAL')throw new Error('UNSUPPORTED_INVITATION_TYPE');
+  const enrollmentPath='/projects/'+projectId+(design?'/design-enrollment':'/professional-enrollment');
+  const pre=await api(enrollmentPath,{method:'GET',headers:{'x-correlation-id':corr()}});
+  const expected=Number(pre.data?.executionVersion||0);
+  if(!expected)throw new Error('ENROLLMENT_EXECUTION_VERSION_REQUIRED');
+  const acceptPath='/projects/'+projectId+(design?'/design-invites/':'/professional-invites/')+inviteId+'/accept';
+  const j=await api(acceptPath,{
+    method:'POST',
+    headers:{'if-match':String(expected),'idempotency-key':idem(design?'design-accept':'professional-accept'),'x-correlation-id':corr()},
+    body:JSON.stringify({})
+  });
+  await refreshEntry();diag(j);say((design?'Design':'Professional')+' invitation accepted.','good');
+  return j;
+}
+async function selectProject(id){
+  if(/(^|[-_])(dev|test|stress|e2e|fixture|synthetic)([-_]|$)/i.test(String(id||'')))throw new Error('CLEAN_PILOT_PROJECT_REQUIRED');
+  activeProjectId=id; workspace=null; roleAssignmentId=null; lastIntentPackageId=null;
+  const p=(entry?.projects||[]).find(x=>x.projectId===id); activeDomain='KITCHEN';
+  renderDomainIntents();
+  $('activeProject').textContent=id+' · '+activeDomain; enableProjectButtons(true); await loadWorkspace();
+}
+function enableProjectButtons(on){
+  ['loadWorkspace','loadJourney','initPilot','setRole','selectIntent','loadPrelim','loadC03','inviteC03','loadRealAssessment','loadGovernedLifecycle','loadT45','createDesignInvite','createProfessionalInvite','viewEstimate','issueEstimate','viewReview','completeScreening','recordDecision','recordShadowPrelimDecision','startShadowAssessment','startFunctionalPlanning','createDesignHandoff','refreshDesignDeps','createWorkPackages','startShadowExecution','refreshExecutionDeps','recordHiddenCondition','createShadowCR','decideShadowCR','applyShadowCR','recordShadowCompletion','recordShadowInspection','recordShadowAcceptance','issueShadowRFU'].forEach(id=>$(id).disabled=!on);
+  $('confirmIntent').disabled=true;
+  $('updateIntentDraft').disabled=true;
+  $('reviseIntent').disabled=true;
+  $('prepareRealAssessment').disabled=!on;
+  $('startRealAssessment').disabled=true;
+  $('submitRealAssessment').disabled=true;
+  $('uploadEvidence').disabled=!on;
+  $('reviewPilotMedia').disabled=!on;
+  $('sendPilotAiMessage').disabled=!on;
+  $('recordExternal').disabled=!on;
+}
+async function loadWorkspace(){
+  if(!activeProjectId)return;
+  const h={'x-correlation-id':corr()};if(roleAssignmentId)h['x-role-assignment-id']=roleAssignmentId;
+  const j=await api('/projects/'+activeProjectId+'/workspace',{method:'GET',headers:h});
+  workspace=j.data; roleAssignmentId=workspace?.access?.roleAssignmentId||null;
+  $('workspaceSummary').innerHTML='<p><span class="badge">Revision '+workspace.revision+'</span> <span class="badge">'+escapeHtml(workspace.access?.role||'')+'</span> <span class="badge">'+escapeHtml(workspace.lifecycle?.stage||'')+'</span></p>'+
+    '<p class="muted">Role assignment: '+escapeHtml(roleAssignmentId||'none')+'</p>';
+  await loadPilot(false).catch(()=>{});
+  diag(j);
+}
+async function loadJourney(){
+  if(!activeProjectId||!roleAssignmentId)throw new Error('WORKSPACE_NOT_LOADED');
+  const j=await api('/projects/'+activeProjectId+'/alpha-journey',{method:'GET',headers:{'x-role-assignment-id':roleAssignmentId}});
+  const d=j.data||{};
+  $('workspaceSummary').innerHTML += '<hr><p><strong>Authoritative next action</strong><br><span class="badge">'+escapeHtml(d.stage||'')+'</span> <span class="badge">'+escapeHtml(d.nextAction||'')+'</span> <span class="badge">'+escapeHtml(d.routeHint||'')+'</span></p>';
+  diag(j); return j;
+}
+let c03Data=null;
+function renderC03(d){
+  c03Data=d;
+  const req=d?.requirement||{},visit=d?.projectFormationVisit||{},carry=d?.carryForward||{},prefill=d?.prefilledAnswers||{};
+  $('c03Status').innerHTML='<strong>C03:</strong> '+escapeHtml(req.required===true?'REQUIRED':'NOT REQUIRED')+' · <span class="badge">'+escapeHtml(req.visitMode||'')+'</span> · '+escapeHtml(visit.coordinationStatus||'')+(carry.active?' · Reused planning answers: '+carry.carriedPromptIds.length+' · New/changed: '+carry.newOrChangedPromptIds.length:'');
+  $('c03Visit').innerHTML='<strong>One-visit coordination:</strong> '+escapeHtml(visit.oneVisitRule||visit.authorityBoundary||'Not yet available.');
+  const prompts=d?.prompts||[];
+  $('c03Prompts').innerHTML=prompts.length?prompts.map(p=>{
+    const a=prefill[p.promptId]||{},reused=Boolean(a.reusedC03);
+    return '<div class="field c03-prompt" data-id="'+escapeHtml(p.promptId)+'"><strong>'+escapeHtml(p.focus||p.promptId)+'</strong><p class="muted">Customer answer: '+escapeHtml(typeof p.customerAnswer==='object'?JSON.stringify(p.customerAnswer):p.customerAnswer??'UNKNOWN')+'</p>'+(reused?'<p class="muted">Reused from prior C03 because the customer answer is unchanged. Review before submitting.</p>':'')+'<label>Enriched requirement</label><textarea class="c03-enriched">'+escapeHtml(a.enrichedRequirement||'')+'</textarea><label>Alternatives considered (comma separated)</label><input class="c03-alt" value="'+escapeHtml((a.alternativesConsidered||[]).join(', '))+'"><label>Tradeoffs (comma separated)</label><input class="c03-trade" value="'+escapeHtml((a.tradeoffs||[]).join(', '))+'"></div>';
+  }).join(''):'<p class="muted">No C03 prompts for this project path.</p>';
+  $('submitC03').disabled=!(d?.assignmentAuthority?.allowed===true&&req.required===true&&prompts.length>0);
+}
+function renderRealAssessment(d){
+  realAssessmentData=d;
+  const a=d?.assessment||{},reuse=a?.reuseSummary||{},qs=a?.questions||[],answers=a?.answers||{};
+  const reused=Number(reuse.reusedAnswerCount||0),total=Number(reuse.totalQuestionCount??qs.length),fresh=Number(reuse.newOrUnverifiedQuestionCount??Math.max(0,total-reused));
+  $('realAssessmentStatus').innerHTML='<strong>Stage:</strong> '+escapeHtml(d?.stage||a?.status||'')+
+    ' · <strong>C02:</strong> '+reused+' reused / '+total+' total / '+fresh+' new or unverified'+
+    (a?.revisionOfAssessmentId?' · supplemental revision of '+escapeHtml(a.revisionOfAssessmentId):'');
+  const pending=qs.filter(q=>!Object.prototype.hasOwnProperty.call(answers,q.questionId));
+  const recordedReview=a?.reuseConditionReview||null;
+  if(recordedReview){
+    $('realAssessmentReuseReview').innerHTML='<div class="status"><strong>C02 reuse condition review recorded.</strong><br>Known unchanged: '+escapeHtml((recordedReview.confirmedUnchangedModuleCodes||[]).join(', ')||'none')+'<br>Changed or uncertain: '+escapeHtml((recordedReview.changedOrUncertainModuleCodes||[]).join(', ')||'none')+'</div>';
+  }else if(qs.length){
+    $('realAssessmentReuseReview').innerHTML='<div class="prelim-group"><h3>Reuse prior C02 facts after an intent change</h3><p class="muted">For each previously captured topic, report only whether you know of a material change since the prior field capture. This is not a technical conclusion. Not reviewed or uncertain means RID will ask the expert to capture the fact again.</p>'+qs.map(q=>'<div class="field"><label>'+escapeHtml(q.moduleCode||q.questionId)+'</label><select data-reuse-module="'+escapeHtml(q.moduleCode||'')+'"><option value="NOT_REVIEWED">Not reviewed — capture again</option><option value="UNCHANGED">No known material change</option><option value="CHANGED_OR_UNCERTAIN">Changed or uncertain — capture again</option></select></div>').join('')+'<label>Optional note</label><input id="realAssessmentReuseNote" placeholder="Known work, damage, access change, or other context since the prior visit"></div>';
+  }else{
+    $('realAssessmentReuseReview').innerHTML='';
+  }
+  $('realAssessmentQuestions').innerHTML=qs.length?qs.map(q=>{
+    const existing=answers[q.questionId],isReused=Boolean(existing?.reusedFact),supplemental=Boolean(q.supplementalCaptureRequired),prior=q.priorReviewedContext||null;
+    const priorContext=supplemental&&prior
+      ? '<div class="status"><strong>Prior reviewed context — not sufficient for the expanded scope.</strong><br>Prior value: '+escapeHtml(typeof prior.value==='object'?JSON.stringify(prior.value):prior.value??'')+
+        '<br>Prior evidence: '+escapeHtml((prior.evidenceRefs||[]).join(', ')||'none')+
+        ((q.missingSourceQuestionIds||[]).length?'<br>New scope not covered previously: '+escapeHtml(q.missingSourceQuestionIds.join(', ')):'')+
+        '<br><span class="muted">RID keeps this prior fact as context only. New evidence is required for the newly activated scope.</span></div>'
+      : '';
+    return '<div class="prelim-group" data-real-q="'+escapeHtml(q.questionId)+'"><strong>'+escapeHtml(q.moduleCode||q.questionId)+'</strong><p>'+escapeHtml(q.prompt||'')+'</p>'+priorContext+
+      (existing?'<p class="muted">'+(isReused?'Reused confirmed fact — current reuse must still be accepted by the expert when this Assessment is submitted.':'Already answered in this Assessment.')+'</p><pre>'+escapeHtml(JSON.stringify(existing,null,2))+'</pre>':
+      '<label>Observed / measured fact</label><textarea class="real-assessment-value"></textarea><label>Evidence refs (comma separated)</label><input class="real-assessment-evidence" placeholder="evidence-id-1, evidence-id-2"><button class="answer-real-assessment">Save C02 answer</button>')+
+      '</div>';
+  }).join(''):'<p class="muted">No active C02 questions.</p>';
+  document.querySelectorAll('.answer-real-assessment').forEach(btn=>btn.onclick=async()=>{
+    const box=btn.closest('[data-real-q]');
+    const qid=box.dataset.realQ;
+    const value=box.querySelector('.real-assessment-value').value.trim();
+    const evidenceRefs=csvList(box.querySelector('.real-assessment-evidence').value);
+    if(!value||!evidenceRefs.length){say('Observed fact and at least one evidence reference are required.','risk');return;}
+    await realAssessmentCommand('ANSWER_EXPERT_ASSESSMENT',{questionId:qid,value,evidenceRefs});
+  });
+  const status=a?.status||'';
+  $('startRealAssessment').disabled=status!=='READY';
+  $('submitRealAssessment').disabled=!['IN_PROGRESS','CLARIFICATION_REQUIRED'].includes(status);
+}
+async function loadRealAssessment(show=true){
+  if(!activeProjectId||!roleAssignmentId)throw new Error('WORKSPACE_NOT_LOADED');
+  const j=await api('/projects/'+activeProjectId+'/assessment',{method:'GET',headers:{'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()}});
+  renderRealAssessment(j.data);
+  if(show)diag(j);
+  return j;
+}
+async function realAssessmentCommand(command,payload={}){
+  if(!realAssessmentData)await loadRealAssessment(false);
+  const expected=Number(realAssessmentData?.executionVersion||0);
+  if(!expected)throw new Error('ASSESSMENT_EXECUTION_VERSION_REQUIRED');
+  const j=await api('/projects/'+activeProjectId+'/assessment/commands',{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(expected),'idempotency-key':idem('real-c02'),'x-correlation-id':corr()},
+    body:JSON.stringify({command,payload})
+  });
+  await loadWorkspace();
+  await loadRealAssessment(false);
+  diag(j);return j;
+}
+async function loadC03(){
+  if(!activeProjectId||!roleAssignmentId)throw new Error('WORKSPACE_NOT_LOADED');
+  const j=await api('/projects/'+activeProjectId+'/c03-enrichment',{method:'GET',headers:{'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()}});
+  renderC03(j.data);diag(j);return j;
+}
+async function inviteC03(){
+  if(!activeProjectId||!workspace?.revision||!roleAssignmentId)throw new Error('WORKSPACE_NOT_LOADED');
+  const invitedEmail=$('c03InviteEmail').value.trim(),displayName=$('c03InviteName').value.trim();
+  if(!invitedEmail||!displayName)throw new Error('C03_INVITE_FIELDS_REQUIRED');
+  const j=await api('/projects/'+activeProjectId+'/c03-assignment/commands',{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(workspace.revision),'idempotency-key':idem('c03-invite'),'x-correlation-id':corr()},
+    body:JSON.stringify({command:'CREATE_C03_INVITE',payload:{invitedEmail,displayName}})
+  });
+  await loadWorkspace();await loadC03().catch(()=>{});diag(j);say('C03 invitation created.','good');
+}
+async function submitC03(){
+  if(!activeProjectId||!roleAssignmentId||!c03Data)throw new Error('C03_NOT_LOADED');
+  const answers={};
+  document.querySelectorAll('.c03-prompt').forEach(w=>{answers[w.dataset.id]={enrichedRequirement:w.querySelector('.c03-enriched').value.trim(),alternativesConsidered:csvList(w.querySelector('.c03-alt').value),tradeoffs:csvList(w.querySelector('.c03-trade').value)}});
+  const j=await api('/projects/'+activeProjectId+'/c03-enrichment/commands',{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(c03Data.revision),'idempotency-key':idem('c03-submit'),'x-correlation-id':corr()},
+    body:JSON.stringify({answers})
+  });
+  await loadWorkspace();await loadC03();diag(j);say('C03 enrichment submitted.','good');
+}
+let governedLifecycleData=null,t45LifecycleData=null;
+async function verifyParticipantCapability(){
+  if(!activeProjectId||!roleAssignmentId)throw new Error('WORKSPACE_NOT_LOADED');
+  if(!governedLifecycleData)await loadGovernedLifecycle(false);
+  const expected=Number(governedLifecycleData?.revision||0);
+  if(!expected)throw new Error('GOVERNED_REVISION_REQUIRED');
+  const payload={
+    targetEmail:$('capTargetEmail').value.trim(),
+    participantType:$('capParticipantType').value,
+    domainCode:$('capDomainCode').value.trim().toUpperCase(),
+    capabilityCode:$('capCapabilityCode').value.trim().toUpperCase(),
+    verificationDecision:'VERIFIED',
+    qualificationRefs:csvList($('capQualificationRefs').value),
+    evidenceRefs:csvList($('capEvidenceRefs').value),
+    serviceRegions:['ON'],
+    authoritySourceRef:$('capAuthoritySourceRef').value.trim(),
+    reason:'RID closed-pilot capability verification'
+  };
+  const effectiveTo=$('capEffectiveTo').value.trim();if(effectiveTo)payload.effectiveTo=effectiveTo;
+  if(!payload.targetEmail||!payload.domainCode||!payload.capabilityCode||!payload.qualificationRefs.length||!payload.evidenceRefs.length||!payload.authoritySourceRef)throw new Error('CAPABILITY_VERIFICATION_FIELDS_REQUIRED');
+  const j=await api('/projects/'+activeProjectId+'/participant-capability/commands',{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(expected),'idempotency-key':idem('capability-verify'),'x-correlation-id':corr()},
+    body:JSON.stringify({type:'VERIFY_PARTICIPANT_CAPABILITY_PROFILE',...payload})
+  });
+  await loadWorkspace();await loadGovernedLifecycle(false);diag(j);say('Capability profile verified. This did not create project participation or assignment.','good');return j;
+}
+async function verifyParticipantOnboardingScreening(){
+  if(!activeProjectId||!roleAssignmentId)throw new Error('WORKSPACE_NOT_LOADED');
+  if(!governedLifecycleData)await loadGovernedLifecycle(false);
+  const expected=Number(governedLifecycleData?.revision||0);
+  if(!expected)throw new Error('GOVERNED_REVISION_REQUIRED');
+  const targetEmail=$('capTargetEmail').value.trim();
+  const participantType=$('capParticipantType').value;
+  const checkType=$('onboardingCheckType').value;
+  const verificationMethod=$('onboardingVerificationMethod').value.trim();
+  const evidenceRefs=csvList($('onboardingEvidenceRefs').value);
+  const authoritySourceRef=$('onboardingAuthoritySourceRef').value.trim();
+  const consentRef=$('onboardingConsentRef').value.trim();
+  const resultNote=$('onboardingResultNote').value.trim();
+  if(!targetEmail||!participantType||!checkType||!verificationMethod||!evidenceRefs.length||!authoritySourceRef)throw new Error('ONBOARDING_SCREENING_FIELDS_REQUIRED');
+  if(checkType==='POLICE_RECORD_CHECK'&&!consentRef)throw new Error('ONBOARDING_SCREENING_CONSENT_REQUIRED');
+  const payload={targetEmail,participantType,checkType,verificationStatus:'VERIFIED',verificationMethod,authoritySourceRef,evidenceRefs,resultSummary:{note:resultNote||'RID closed-pilot onboarding verification'},context:{requireCapacity:false,occupiedHomeAccess:true,unsupervisedPropertyAccess:false,highValuePrivateAreaAccess:false}};
+  if(consentRef)payload.consentRef=consentRef;
+  const j=await api('/projects/'+activeProjectId+'/participant-capability/commands',{method:'POST',headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(expected),'idempotency-key':idem('onboarding-screening'),'x-correlation-id':corr()},body:JSON.stringify({type:'VERIFY_PARTICIPANT_ONBOARDING_SCREENING',...payload})});
+  await loadWorkspace();await loadGovernedLifecycle(false);diag(j);
+  say('Onboarding screening recorded. This did not create project assignment.','good');
+  return j;
+}
+async function createParticipantInvite(kind){
+  if(!activeProjectId||!roleAssignmentId)throw new Error('WORKSPACE_NOT_LOADED');
+  const design=kind==='DESIGN';
+  const path='/projects/'+activeProjectId+(design?'/design-invites':'/professional-invites');
+  const pre=await api(path,{method:'GET',headers:{'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()}});
+  const expected=Number(pre.data?.executionVersion||0);if(!expected)throw new Error('ENROLLMENT_EXECUTION_VERSION_REQUIRED');
+  const invitedEmail=$(design?'designInviteEmail':'professionalInviteEmail').value.trim();
+  const displayName=$(design?'designInviteName':'professionalInviteName').value.trim();
+  const targetRoleAssignmentId=$(design?'designInviteRoleId':'professionalInviteRoleId').value.trim();
+  const participantRole=$(design?'designInviteRole':'professionalInviteRole').value;
+  if(!invitedEmail||!displayName||!targetRoleAssignmentId)throw new Error('INVITE_FIELDS_REQUIRED');
+  const body=design?{invitedEmail,displayName,roleAssignmentId:targetRoleAssignmentId,participantRole}:{
+    invitedEmail,displayName,roleAssignmentId:targetRoleAssignmentId,participantRole,
+    qualificationRefs:csvList($('professionalInviteQualifications').value)
+  };
+  if(!design&&!body.qualificationRefs.length)throw new Error('PROFESSIONAL_QUALIFICATION_REFS_REQUIRED');
+  const j=await api(path,{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(expected),'idempotency-key':idem(design?'design-invite':'professional-invite'),'x-correlation-id':corr()},
+    body:JSON.stringify(body)
+  });
+  await refreshEntry();await loadWorkspace();diag(j);say((design?'Design':'Professional')+' invitation created. Acceptance remains capability-gated.','good');return j;
+}
+function renderGovernedLifecycle(d){
+  governedLifecycleData=d;
+  const lc=d?.lifecycle||{},rw=d?.roleWorkspace||{};
+  $('governedLifecycleStatus').innerHTML='<strong>'+escapeHtml(lc.stage||'')+'</strong> · <span class="badge">'+escapeHtml(lc.stageState||'')+'</span> · next '+escapeHtml(lc.nextAction||rw.primaryAction||'')+'<br><span class="muted">Role '+escapeHtml(d?.access?.role||'')+' · DB revision '+escapeHtml(d?.revision??'')+'</span>';
+  const state=String(lc.stageState||'');
+  const activeRole=String(d?.access?.role||'').toUpperCase();
+  const ownerRole=['PROPERTY_OWNER','CUSTOMER','PROJECT_PRINCIPAL','OWNER_REPRESENTATIVE'].includes(activeRole);
+  const proceduralRole=['RID_PLATFORM_ADMIN','CASE_OPERATOR'].includes(activeRole);
+  $('confirmFactualReview').disabled=!(ownerRole&&state==='CUSTOMER_FACTUAL_REVIEW_REQUIRED');
+  $('issueInputBaseline').disabled=!(proceduralRole&&['FACTUAL_REVIEW_COMPLETE','PROJECT_INPUT_BASELINE_ESTABLISHED'].includes(state));
+  $('verifyCapability').disabled=!proceduralRole;
+  $('verifyOnboardingScreening').disabled=!proceduralRole;
+  $('runT3Readiness').disabled=!['PROJECT_INPUT_BASELINE_ESTABLISHED','T3_READINESS_BLOCKED','T3_READY_FOR_CONFIGURATION'].includes(state);
+  $('runT3Command').disabled=String(lc.stage||'')!=='T3';
+}
+async function loadGovernedLifecycle(show=true){
+  if(!activeProjectId||!roleAssignmentId)throw new Error('WORKSPACE_NOT_LOADED');
+  const j=await api('/projects/'+activeProjectId+'/governed-workspace',{method:'GET',headers:{'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()}});
+  renderGovernedLifecycle(j.data);
+  if(show)diag(j);
+  return j;
+}
+async function governedWorkspaceCommand(type,payload={}){
+  if(!governedLifecycleData)await loadGovernedLifecycle(false);
+  const expected=Number(governedLifecycleData?.revision||0);
+  if(!expected)throw new Error('GOVERNED_REVISION_REQUIRED');
+  const j=await api('/projects/'+activeProjectId+'/governed-workspace/commands',{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(expected),'idempotency-key':idem('governed'),'x-correlation-id':corr()},
+    body:JSON.stringify({type,...payload})
+  });
+  await loadWorkspace();
+  await loadGovernedLifecycle(false);
+  $('governedLifecycleResult').innerHTML='<pre>'+escapeHtml(JSON.stringify(j.data||j,null,2))+'</pre>';
+  diag(j);return j;
+}
+function renderT45(d){
+  t45LifecycleData=d;
+  const v=d?.views||{},handoff=v.designHandoff||{},review=v.configurationReview||{};
+  $('t45Status').innerHTML='<strong>'+escapeHtml(d?.stage||'')+'</strong> · <span class="badge">'+escapeHtml(d?.workspaceRole||'')+'</span> · execution '+escapeHtml(d?.executionVersion??'')+
+    '<br><span class="muted">Design assignment: '+escapeHtml(handoff.designAssignmentState||'')+' · candidates '+escapeHtml((review.candidates||[]).length)+' · Approved Baseline '+escapeHtml(review.currentApprovedBaseline?.approvedBaselineId||'none')+'</span>'+
+    '<pre>'+escapeHtml(JSON.stringify({nextActions:d?.nextActions||[],configurationEntryGate:handoff.configurationEntryGate||null,approvalConditions:v.approvalConditions||null},null,2))+'</pre>';
+  $('runT45Command').disabled=!d?.executionVersion;
+  $('runT5Approval').disabled=!d?.executionVersion;
+  $('runT5Baseline').disabled=!d?.executionVersion;
+}
+async function loadT45(show=true){
+  if(!activeProjectId||!roleAssignmentId)throw new Error('WORKSPACE_NOT_LOADED');
+  const j=await api('/projects/'+activeProjectId+'/t45-workspace',{method:'GET',headers:{'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()}});
+  renderT45(j.data);
+  if(show)diag(j);
+  return j;
+}
+async function runT45Command(){
+  if(!t45LifecycleData)await loadT45(false);
+  const expected=Number(t45LifecycleData?.executionVersion||0);
+  if(!expected)throw new Error('T45_EXECUTION_VERSION_REQUIRED');
+  let payload={};try{payload=JSON.parse($('t45Payload').value||'{}')}catch{throw new Error('INVALID_T45_JSON')}
+  const j=await api('/projects/'+activeProjectId+'/t45-commands',{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(expected),'idempotency-key':idem('t45'),'x-correlation-id':corr()},
+    body:JSON.stringify({type:$('t45Command').value,...payload})
+  });
+  await loadWorkspace();await loadT45(false);diag(j);return j;
+}
+async function runT5ActorApproval(){
+  if(!t45LifecycleData)await loadT45(false);
+  const expected=Number(t45LifecycleData?.executionVersion||0);
+  if(!expected)throw new Error('T45_EXECUTION_VERSION_REQUIRED');
+  let payload={};try{payload=JSON.parse($('t5ApprovalPayload').value||'{}')}catch{throw new Error('INVALID_APPROVAL_JSON')}
+  const j=await api('/projects/'+activeProjectId+'/t5-actor-approval',{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(expected),'idempotency-key':idem('t5-approval'),'x-correlation-id':corr()},
+    body:JSON.stringify(payload)
+  });
+  await loadWorkspace();await loadT45(false);diag(j);return j;
+}
+async function runT5Baseline(){
+  if(!t45LifecycleData)await loadT45(false);
+  const expected=Number(t45LifecycleData?.executionVersion||0);
+  if(!expected)throw new Error('T45_EXECUTION_VERSION_REQUIRED');
+  let payload={};try{payload=JSON.parse($('t5BaselinePayload').value||'{}')}catch{throw new Error('INVALID_BASELINE_JSON')}
+  const j=await api('/projects/'+activeProjectId+'/t5-baseline',{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(expected),'idempotency-key':idem('t5-baseline'),'x-correlation-id':corr()},
+    body:JSON.stringify(payload)
+  });
+  await loadWorkspace();await loadT45(false);diag(j);return j;
+}
+function renderShadowAssessment(p){
+  const box=$('shadowAssessment'),sa=p.shadowAssessment;
+  if(!sa){box.innerHTML='<p class="muted">Not started.</p>';$('completeShadowAssessment').disabled=true;return;}
+  const answers=sa.answers||{};
+  const ev=p.evidence||[];
+  box.innerHTML='<p><span class="badge sim">'+escapeHtml(sa.status||'')+'</span> <span class="badge">Evidence '+ev.length+'</span></p>'+
+  (sa.questions||[]).map(q=>{
+    const a=answers[q.questionId]||{};
+    const opts=['OBSERVED','CUSTOMER_REPORTED','UNKNOWN','NOT_APPLICABLE'].map(x=>'<option '+(a.answerStatus===x?'selected':'')+'>'+x+'</option>').join('');
+    const refs=(a.evidenceRefs||[]).join(',');
+    return '<div class="field shadow-q" data-qid="'+q.questionId+'"><h3>'+escapeHtml(q.moduleCode)+'</h3><p class="muted">'+escapeHtml(q.prompt)+'</p>'+
+      '<label>Status</label><select class="sa-status">'+opts+'</select>'+
+      '<label>Observation / limitation / unknown</label><textarea class="sa-value">'+escapeHtml(a.value||'')+'</textarea>'+
+      '<label>Evidence IDs (comma separated)</label><input class="sa-evidence" value="'+escapeHtml(refs)+'" placeholder="'+escapeHtml(ev.map(x=>x.evidenceId).join(', '))+'">'+
+      '<button class="save-sa">Save answer</button></div>';
+  }).join('')+
+  ((sa.dependencies||[]).length?'<h3>Derived dependencies</h3><pre>'+escapeHtml(JSON.stringify(sa.dependencies,null,2))+'</pre>':'');
+  document.querySelectorAll('.save-sa').forEach(btn=>btn.onclick=async()=>{
+    const wrap=btn.closest('.shadow-q');
+    const evidenceRefs=wrap.querySelector('.sa-evidence').value.split(',').map(x=>x.trim()).filter(Boolean);
+    try{await pilotCommand('RECORD_SHADOW_ASSESSMENT_ANSWER',{
+      questionId:wrap.dataset.qid,answerStatus:wrap.querySelector('.sa-status').value,
+      value:wrap.querySelector('.sa-value').value,evidenceRefs
+    });}catch(e){say(e.message,'risk')}
+  });
+  $('completeShadowAssessment').disabled=sa.status!=='IN_PROGRESS';
+}
+function csvList(v){return String(v||'').split(',').map(x=>x.trim()).filter(Boolean)}
+function renderFunctionalPlanning(p){
+  const fp=p.functionalPlanning,box=$('functionalPlanning');
+  const sa=p.shadowAssessment;
+  $('startFunctionalPlanning').disabled=!(p.status==='ACTIVE'&&sa&&['COMPLETED_SHADOW','COMPLETED_WITH_UNKNOWNS'].includes(sa.status)&&!fp);
+  if(!fp){box.innerHTML='<p class="muted">Complete the shadow assessment, then derive downstream simulation options from the real Preliminary Project / C03 formation result.</p>';return;}
+  const selected=fp.selectedOptionId;
+  box.innerHTML='<p><span class="badge sim">'+escapeHtml(fp.status||'')+'</span> <span class="badge">'+escapeHtml(fp.selectionState||'No selection')+'</span> <span class="badge">'+escapeHtml(fp.sourceMode||'PROJECT_FORMATION_SOURCE')+'</span></p>'+
+  (fp.options||[]).map(o=>{
+    const holds=(o.dependencies||[]).filter(d=>d.hardHold);
+    return '<div class="field fsp-option" data-option="'+o.optionId+'"><h3>'+escapeHtml(o.title)+'</h3>'+
+      '<p><span class="badge">'+escapeHtml(o.wallStrategy)+'</span> '+(selected===o.optionId?'<span class="badge good">Selected</span>':'')+
+      (holds.length?'<span class="badge risk">Local hold: '+escapeHtml(holds.map(h=>h.type).join(', '))+'</span>':'')+'</p>'+
+      '<p class="muted">Geometry: '+escapeHtml(o.geometryStatus)+' · Quantities: '+escapeHtml(o.quantitiesStatus)+' · Pricing: '+escapeHtml(o.pricingStatus)+'</p>'+
+      '<label>Circulation / workflow notes</label><textarea class="fsp-circ">'+escapeHtml(o.circulationNotes||'')+'</textarea>'+
+      '<label>Storage notes</label><textarea class="fsp-storage">'+escapeHtml(o.storageNotes||'')+'</textarea>'+
+      '<label>Appliance notes</label><textarea class="fsp-appliance">'+escapeHtml(o.applianceNotes||'')+'</textarea>'+
+      '<label>Plumbing notes</label><textarea class="fsp-plumbing">'+escapeHtml(o.plumbingNotes||'')+'</textarea>'+
+      '<label>Electrical notes</label><textarea class="fsp-electrical">'+escapeHtml(o.electricalNotes||'')+'</textarea>'+
+      '<label>Ventilation notes</label><textarea class="fsp-vent">'+escapeHtml(o.ventilationNotes||'')+'</textarea>'+
+      '<label>General notes</label><textarea class="fsp-notes">'+escapeHtml(o.notes||'')+'</textarea>'+
+      '<button class="save-fsp">Save planning notes</button><button class="select-fsp secondary">Select as customer preference</button>'+
+      ((o.dependencies||[]).length?'<pre>'+escapeHtml(JSON.stringify(o.dependencies,null,2))+'</pre>':'')+'</div>';
+  }).join('');
+  document.querySelectorAll('.save-fsp').forEach(btn=>btn.onclick=async()=>{
+    const w=btn.closest('.fsp-option');
+    try{await pilotCommand('UPDATE_FUNCTIONAL_OPTION',{
+      optionId:w.dataset.option, circulationNotes:w.querySelector('.fsp-circ').value,
+      storageNotes:w.querySelector('.fsp-storage').value, applianceNotes:w.querySelector('.fsp-appliance').value,
+      plumbingNotes:w.querySelector('.fsp-plumbing').value, electricalNotes:w.querySelector('.fsp-electrical').value,
+      ventilationNotes:w.querySelector('.fsp-vent').value, notes:w.querySelector('.fsp-notes').value
+    });}catch(e){say(e.message,'risk')}
+  });
+  document.querySelectorAll('.select-fsp').forEach(btn=>btn.onclick=async()=>{
+    try{await pilotCommand('SELECT_FUNCTIONAL_OPTION',{optionId:btn.closest('.fsp-option').dataset.option});}catch(e){say(e.message,'risk')}
+  });
+}
+function selectedWP(){return $('shadowWorkPackage').value}
+function selectedCR(){return $('shadowCR').value}
+function renderShadowExecution(p){
+  const sd=p.shadowDesign,se=p.shadowExecution,box=$('shadowExecution');
+  $('createDesignHandoff').disabled=!(p.functionalPlanning&&p.functionalPlanning.selectedOptionId&&!sd);
+  $('refreshDesignDeps').disabled=!sd;
+  $('createWorkPackages').disabled=!sd||!!se;
+  $('startShadowExecution').disabled=!se||se.status!=='WORK_PACKAGES_PLANNED_SHADOW';
+  $('refreshExecutionDeps').disabled=!se||se.status!=='IN_PROGRESS_SHADOW';
+  const wps=(se&&se.workPackages)||[];
+  $('shadowWorkPackage').innerHTML=wps.map(w=>'<option value="'+w.workPackageId+'">'+escapeHtml(w.code+' — '+w.title+' ['+w.status+']')+'</option>').join('');
+  const crs=(se&&se.changeRequests)||[];
+  $('shadowCR').innerHTML=crs.map(c=>'<option value="'+c.changeRequestId+'">'+escapeHtml(c.status+' — '+(c.description||c.changeRequestId))+'</option>').join('');
+  const active=!!se;
+  ['recordHiddenCondition','createShadowCR','recordShadowCompletion','recordShadowInspection'].forEach(id=>$(id).disabled=!active||!wps.length);
+  ['decideShadowCR','applyShadowCR'].forEach(id=>$(id).disabled=!active||!crs.length);
+  $('recordShadowAcceptance').disabled=!active;
+  $('issueShadowRFU').disabled=!se||se.status!=='CUSTOMER_ACCEPTED_SHADOW';
+  if(!sd&&!se){box.innerHTML='<p class="muted">Select a functional option first.</p>';return;}
+  box.innerHTML=(sd?'<h3>Shadow design handoff</h3><pre>'+escapeHtml(JSON.stringify(sd,null,2))+'</pre>':'')+
+    (se?'<h3>Shadow execution state</h3><pre>'+escapeHtml(JSON.stringify(se,null,2))+'</pre>':'');
+}
+async function renderCustomerConcept(p){
+ const c=p?.preliminaryConcept||null;const enabled=activeProjectId==='rid-b993bbf55aff4ac6819dc7092e56c0f6'&&p.activeShadowRole==='CUSTOMER';
+ $('conceptStatus').textContent=c?'Version '+c.version+' | '+c.status+' | '+c.drawingKind:'No concept generated';
+ $('conceptGraphic').innerHTML=c&&c.svg?'<div>'+c.svg+'</div><p>NOT TO SCALE - NOT FOR CONSTRUCTION</p>':'';
+ $('buildCustomerConcept').disabled=!enabled;
+ for(const k of ['reviseCustomerConcept','acceptCustomerConcept','deferCustomerConcept'])$(k).disabled=!enabled||!c;
+}
+async function conceptAction(command){
+ const j=await pilotCommand(command,{note:$('conceptDecisionNote').value.trim()});await loadPilot(false);say('Saved '+command,'good');return j;
+}
+function pilotCommand(command,payload={}){
+  if(!workspace||!roleAssignmentId)throw new Error('WORKSPACE_NOT_LOADED');
+  const j=await api('/projects/'+activeProjectId+'/pilot/commands',{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'if-match':String(workspace.revision),'idempotency-key':idem('pilot')},
+    body:JSON.stringify({command,payload})
+  });
+  await loadWorkspace(); return j;
+}
+async function loadPilot(show=true){
+  const j=await api('/projects/'+activeProjectId+'/pilot',{method:'GET',headers:{'x-role-assignment-id':roleAssignmentId}});
+  const p=j.data;
+  renderCustomerConcept(p);
+  $('topState').innerHTML='<span class="badge sim">'+escapeHtml(p.mode||'NOT INITIALIZED')+'</span> <span class="badge">'+escapeHtml(p.activeShadowRole||'')+'</span>';
+  $('shadowRole').value=p.activeShadowRole||'CUSTOMER';
+  $('topState').innerHTML='<span class="badge sim">'+escapeHtml(p.mode||'NOT INITIALIZED')+'</span> <span class="badge">'+escapeHtml(p.activeShadowRole||'')+'</span> <span class="badge">'+escapeHtml(p.nextShadowAction||'')+'</span>';
+  const notices=(p.notifications||[]).slice(-8).reverse();
+  $('roleInbox').innerHTML='<strong>Current role:</strong> '+escapeHtml(p.activeShadowRole||'CUSTOMER')+'<br><strong>Next RID action:</strong> '+escapeHtml(p.nextShadowAction||'')+(notices.length?'<hr>'+notices.map(n=>'<div><span class="badge">'+escapeHtml(n.targetShadowRole)+'</span> '+escapeHtml(n.sourceCommand)+' · '+escapeHtml(n.status)+'</div>').join(''):'');
+  if(p.coreIntent){
+    lastIntentPackageId=p.coreIntent.intentPackageId||lastIntentPackageId;
+    const status=p.coreIntent.status||'';
+    $('intentStatus').textContent='Intent status: '+status+' · Revision '+(p.coreIntent.intentRevision||1)+' · Primary: '+(p.coreIntent.primaryIntent||'')+((p.coreIntent.secondaryIntents||[]).length?' · Secondary: '+p.coreIntent.secondaryIntents.join(', '):'');
+    if(p.coreIntent.primaryIntent)$('primaryIntent').value=p.coreIntent.primaryIntent;
+    const selected=new Set(p.coreIntent.secondaryIntents||[]);
+    [...$('secondaryIntents').options].forEach(o=>o.selected=selected.has(o.value));
+    $('selectIntent').disabled=true;
+    $('updateIntentDraft').disabled=status!=='DRAFT';
+    $('reviseIntent').disabled=status!=='CONFIRMED';
+    $('confirmIntent').disabled=!(status==='DRAFT'&&lastIntentPackageId);
+  }else{
+    $('selectIntent').disabled=false;
+    $('updateIntentDraft').disabled=true;
+    $('reviseIntent').disabled=true;
+    $('confirmIntent').disabled=true;
+  }
+  const pilotActive=p.status==='ACTIVE';
+  $('uploadEvidence').disabled=!pilotActive;
+  $('reviewPilotMedia').disabled=!pilotActive;
+  $('sendPilotAiMessage').disabled=!pilotActive;
+  $('recordExternal').disabled=!pilotActive;
+  $('startShadowAssessment').disabled=!pilotActive;
+  renderShadowAssessment(p);
+  renderFunctionalPlanning(p);
+  renderShadowExecution(p);
+  renderPilotAssistant(p);
+  if(show)diag(j); return p;
+}
+async function intentCommand(command,payload){
+  if(!roleAssignmentId)throw new Error('WORKSPACE_ROLE_REQUIRED');
+  const j=await api('/projects/'+activeProjectId+'/workspace/commands',{
+    method:'POST',
+    headers:{'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr(),'if-match':String(workspace.revision),'idempotency-key':idem('intent')},
+    body:JSON.stringify({command,payload})
+  });
+  if(j.data?.intent?.intentPackageId){lastIntentPackageId=j.data.intent.intentPackageId;$('confirmIntent').disabled=false;}
+  $('intentStatus').textContent='Intent status: '+(j.data?.intent?.status||'updated')+' · '+(j.data?.intent?.primaryIntent||'');
+  await loadWorkspace(); return j;
+}
+function selectedIntentPayload(includeReason=false){
+  const primary=$('primaryIntent').value;
+  const secondary=[...$('secondaryIntents').selectedOptions].map(o=>o.value).filter(x=>x&&x!==primary);
+  const payload={domain:activeDomain.toLowerCase(),primaryIntent:primary,secondaryIntents:[...new Set(secondary)]};
+  if(includeReason)payload.changeReason=$('intentChangeReason').value.trim()||null;
+  return payload;
+}
+async function loadPrelim(){
+  const j=await api('/projects/'+activeProjectId+'/preliminary-input',{
+    method:'GET',headers:{'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()}
+  });
+  prelimSchema=j.data;
+  prelimSelectedFollowupIds=new Set((prelimSchema?.mediaFollowupCandidates?.items||[]).filter(x=>x.consumedInCurrentC01).map(x=>x.intakeFollowupResponseId));
+  renderPrelim(prelimSchema?.prefilledAnswers||{});
+  renderPrelimProgress();
+  diag(j);
+}
+function renderPrelimProgress(){
+  const stage=prelimSchema?.intakeProgress||'CUSTOMER_DEFINITION';
+  const labels={
+    CUSTOMER_DEFINITION:'Step 1 · Describe the project',
+    PROJECT_CONTEXT:'Step 2 · Confirm constraints and basic project facts',
+    DOMAIN_DELTAS:'Step 3 · Answer only the relevant project-specific questions'
+  };
+  const combo=prelimSchema?.multiIntentCombination;
+  const blockers=prelimSchema?.contentBlockers||[];
+  let extra='';
+  if(combo?.active)extra+=' · Multi-intent coordination: '+combo.selectedIntentCount+' intents';
+  const carry=prelimSchema?.carryForward;
+  if(carry?.active)extra+=' · Reused answers: '+carry.carriedQuestionIds.length+' · New questions: '+carry.newQuestionIds.length;
+  if(blockers.length)extra+=' · CONTENT MAPPING REQUIRED';
+  $('prelimProgress').textContent=(labels[stage]||stage)+extra;
+}
+function renderPrelim(savedAnswers={}){
+  const fields=prelimSchema.fields||[];
+  const groups=new Map();
+  fields.forEach(f=>{
+    const key=f.section||'PROJECT';
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(f);
+  });
+  const renderField=f=>{
+    let ctl='';
+    if(f.type==='boolean')ctl='<select data-fid="'+f.id+'" data-type="boolean"><option value="">—</option><option value="true">Yes</option><option value="false">No</option><option value="UNKNOWN">Unknown</option></select>';
+    else if(f.type==='enum')ctl='<select data-fid="'+f.id+'" data-type="enum"><option value="">—</option>'+(f.options||[]).map(o=>'<option>'+escapeHtml(o)+'</option>').join('')+'</select>';
+    else if(f.type==='text')ctl='<textarea data-fid="'+f.id+'" data-type="text"></textarea>';
+    else ctl='<input data-fid="'+f.id+'" data-type="'+f.type+'" type="'+(f.type==='number'?'number':'text')+'" '+(f.min!=null?'min="'+f.min+'"':'')+' '+(f.max!=null?'max="'+f.max+'"':'')+'>';
+    const carried=Boolean(prelimSchema?.carryForward?.carriedQuestionIds?.includes(f.id));
+    const note=(carried?'<div class="muted">Reused from your previous confirmed project definition. Review and change it if your goal has changed.</div>':'')+(f.approximate?'<div class="muted">Approximate customer-reported value; C02 verification may follow.</div>':'')+(f.unknownAllowed?'<div class="muted">Unknown is acceptable when you do not know.</div>':'');
+    return '<div class="field"><label>'+escapeHtml(f.label)+(f.unit?' ('+escapeHtml(f.unit)+')':'')+(f.required?' *':'')+'</label>'+ctl+note+'</div>';
+  };
+  $('prelimFields').innerHTML=[...groups.entries()].map(([section,items])=>{
+    const sorted=[...items].sort((a,b)=>Number(b.required)-Number(a.required));
+    const req=sorted.filter(x=>x.required).length;
+    const opt=sorted.length-req;
+    return '<div class="prelim-group"><h3>'+escapeHtml(section.replaceAll('_',' '))+'</h3><div class="prelim-group-meta">'+req+' required'+(opt?' · '+opt+' optional':'')+'</div>'+sorted.map(renderField).join('')+'</div>';
+  }).join('');
+  document.querySelectorAll('[data-fid]').forEach(el=>{
+    if(!Object.prototype.hasOwnProperty.call(savedAnswers,el.dataset.fid))return;
+    const v=savedAnswers[el.dataset.fid];
+    el.value=(typeof v==='boolean')?String(v):String(v??'');
+  });
+  const goals=prelimSchema.activeEvidenceGoals||[];
+  $('prelimEvidenceGoals').innerHTML=goals.length
+    ? '<h3>Evidence guidance</h3>'+goals.map(g=>'<div class="field"><strong>'+escapeHtml(g.label||g.goalId)+'</strong><div class="muted">'+escapeHtml(g.instruction||'')+'</div></div>').join('')
+    : '';
+  renderMediaFollowupCandidates();
+  $('previewPrelim').disabled=false;
+  $('submitPrelim').disabled=(prelimSchema?.contentBlockers||[]).length>0;
+}
+function renderMediaFollowupCandidates(){
+  const box=$('prelimMediaFollowups');if(!box)return;
+  const xs=prelimSchema?.mediaFollowupCandidates?.items||[];
+  if(!xs.length){box.innerHTML='';return}
+  box.innerHTML='<h3>Confirmed media follow-ups available for C01</h3><div class="muted">Select only the participant-confirmed answers you want to use in this C01 submission. AI observations are never applied automatically. If a selected candidate conflicts with the form answer, preview/submit fails until you explicitly resolve the conflict.</div>'+xs.map(x=>'<label class="field"><input type="checkbox" data-followup-response-id="'+escapeHtml(x.intakeFollowupResponseId)+'" '+(prelimSelectedFollowupIds.has(x.intakeFollowupResponseId)?'checked':'')+'> <strong>'+escapeHtml(x.targetQuestionId||'C01 question')+'</strong> · '+escapeHtml(JSON.stringify(x.answerValue))+(x.consumedInCurrentC01?' <span class="badge good">current C01</span>':'')+(x.followupPrompt?'<div class="muted">'+escapeHtml(x.followupPrompt)+'</div>':'')+'</label>').join('');
+  box.querySelectorAll('[data-followup-response-id]').forEach(el=>el.onchange=()=>{const id=el.getAttribute('data-followup-response-id');if(el.checked)prelimSelectedFollowupIds.add(id);else prelimSelectedFollowupIds.delete(id)});
+}
+function selectedFollowupResponseIds(){return [...prelimSelectedFollowupIds]}
+function collectPrelim(){
+  const answers={};
+  document.querySelectorAll('[data-fid]').forEach(el=>{
+    let v=el.value;if(v==='')return;
+    const t=el.dataset.type;if(t==='number')v=Number(v);if(t==='boolean'&&v!=='UNKNOWN')v=(v==='true');
+    answers[el.dataset.fid]=v;
+  });
+  return answers;
+}
+async function prelim(postCommand){
+  const path='/projects/'+activeProjectId+'/preliminary-input'+(postCommand?'/commands':'/preview');
+  const h={'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()};
+  if(postCommand){h['if-match']=String(workspace.revision);h['idempotency-key']=idem('prelim');}
+  const answers=collectPrelim(),followupResponseIds=selectedFollowupResponseIds();
+  const j=await api(path,{method:'POST',headers:h,body:JSON.stringify({answers,followupResponseIds})});
+  if(!postCommand){
+    prelimSchema={...prelimSchema,fields:j.data?.activeQuestions||prelimSchema.fields,activeEvidenceGoals:j.data?.activeEvidenceGoals||[],multiIntentCombination:j.data?.multiIntentCombination||null,contentBlockers:j.data?.contentBlockers||[]};
+    renderPrelim(answers);
+    renderPrelimProgress();
+  }
+  const summary={
+    intakeProgress:j.data?.intakeProgress,
+    readiness:j.data?.readiness,
+    confidence:j.data?.confidence,
+    activeQuestionCount:j.data?.activeQuestions?.length??prelimSchema.fields?.length??0,
+    suppressedQuestionCount:j.data?.suppressedQuestions?.length??0,
+    unknowns:j.data?.unknowns??[],
+    missing:j.data?.missing??[],
+    dependencies:j.data?.projectSynthesisDependencies??[],
+    evidenceGoals:j.data?.activeEvidenceGoals??[],
+    multiIntentCombination:j.data?.multiIntentCombination??null,
+    contentBlockers:j.data?.contentBlockers??[]
+  };
+  $('prelimResult').innerHTML='<pre>'+escapeHtml(JSON.stringify(summary,null,2))+'</pre>';
+  if(postCommand){await loadWorkspace();await loadPrelim()} return j;
+}
+async function estimate(issue=false){
+  const h={'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()};
+  if(issue){h['if-match']=String(workspace.revision);h['idempotency-key']=idem('estimate');}
+  const j=await api('/projects/'+activeProjectId+'/preliminary-estimate',{method:issue?'POST':'GET',headers:h,body:issue?JSON.stringify({}):undefined});
+  $('frontHalfResult').innerHTML='<pre>'+escapeHtml(JSON.stringify(j.data,null,2))+'</pre>';
+  if(issue)await loadWorkspace(); diag(j); return j;
+}
+async function recordShadowPreliminaryDecision(){
+  const j=await pilotCommand('RECORD_SHADOW_PRELIMINARY_DECISION',{decision:$('shadowPrelimDecision').value,note:$('shadowPrelimNote').value||null});
+  const d=j.data?.shadowPreliminaryDecision||{};
+  $('shadowPrelimStatus').innerHTML='<span class="badge sim">'+escapeHtml(d.decision||'RECORDED')+'</span> '+escapeHtml(d.pricingContext||'SIMULATED_EXTERNAL_EFFECT')+' · not authoritative T1';
+  diag(j);return j;
+}
+async function review(command=null){
+  const h={'x-role-assignment-id':roleAssignmentId,'x-correlation-id':corr()};
+  const opts={method:command?'POST':'GET',headers:h};
+  if(command){
+    h['if-match']=String(workspace.revision);h['idempotency-key']=idem('review');
+    if(command==='RECORD_PRELIMINARY_CUSTOMER_DECISION'){
+      opts.body=JSON.stringify({command,decision:$('customerDecision').value,note:$('customerDecisionNote').value||null});
+    }else{
+      opts.body=JSON.stringify({command});
+    }
+  }
+  const j=await api('/projects/'+activeProjectId+'/preliminary-review'+(command?'/commands':''),opts);
+  $('frontHalfResult').innerHTML='<pre>'+escapeHtml(JSON.stringify(j.data,null,2))+'</pre>';
+  if(command)await loadWorkspace(); diag(j); return j;
+}
+async function uploadEvidence(){
+  if(!activeProjectId||!roleAssignmentId)throw new Error('PROJECT_NOT_SELECTED');
+  const file=$('evidenceFile').files[0];if(!file)throw new Error('FILE_REQUIRED');
+  const me=await fetch('/auth/v1/user',{headers:{apikey:cfg.publishableKey,authorization:'Bearer '+token()}}).then(r=>r.json());
+  if(!me.id)throw new Error('USER_LOOKUP_FAILED');
+  const safeName=file.name.replace(/[^A-Za-z0-9._-]+/g,'_').slice(-100)||'photo';
+  const objectName=me.id+'/'+activeProjectId+'/'+Date.now()+'-'+crypto.randomUUID()+'-'+safeName;
+  const objectPath=objectName.split('/').map(encodeURIComponent).join('/');
+  const up=await fetch('/storage/v1/object/rid-evidence/'+objectPath,{
+    method:'POST',headers:{apikey:cfg.publishableKey,authorization:'Bearer '+token(),'content-type':file.type||'application/octet-stream','x-upsert':'false'},body:file
+  });
+  const uj=await up.json().catch(()=>({}));if(!up.ok)throw new Error(uj.message||uj.error||'UPLOAD_FAILED');
+  const j=await pilotCommand('REGISTER_EVIDENCE',{
+    objectName,category:$('evidenceCategory').value,provenance:$('evidenceProvenance').value,caption:$('evidenceCaption').value
+  });
+  $('evidenceStatus').innerHTML='<span class="badge good">Uploaded and registered</span> '+escapeHtml(objectName);
+  $('evidenceFile').value=''; diag(j);
+}
+function renderPilotAssistant(p){
+  const review=p?.latestMediaReview||p?.mediaReview||null;
+  const mediaBox=$('pilotMediaReview');
+  if(mediaBox){
+    mediaBox.innerHTML=review
+      ? '<strong>Coverage:</strong> '+escapeHtml(review.completeness||'')+' · images '+escapeHtml(review.imageCount||0)+' · videos '+escapeHtml(review.videoCount||0)+((review.missingCategories||[]).length?'<br><strong>Suggested follow-up:</strong> '+escapeHtml((review.followUpRequests||[]).map(x=>x.request||x.category).join(' · ')):'<br>No missing coverage category identified by this pilot review.')
+      : 'No media coverage review in this session.';
+  }
+  const items=(p?.aiConversation||[]).slice(-8);
+  const chat=$('pilotAiConversation');
+  if(chat)chat.innerHTML=items.length?items.map(x=>'<div class=\"field\"><strong>'+escapeHtml(x.shadowRole||'RID')+':</strong> '+escapeHtml(x.userMessage||'')+'<br><strong>RID:</strong> '+escapeHtml(x.assistantReply||'')+'</div>').join(''):'No pilot assistant messages yet.';
+}
+async function askPilotAssistant(){
+  const message=$('pilotAiMessage').value.trim();
+  if(!message)throw new Error('PILOT_AI_MESSAGE_REQUIRED');
+  const j=await pilotCommand('PILOT_AI_MESSAGE',{message});
+  $('pilotAiMessage').value='';diag(j);return j;
+}
+async function reviewPilotMedia(){
+  const j=await pilotCommand('PILOT_MEDIA_REVIEW',{});diag(j);return j;
+}
+async function recordExternal(){
+  const j=await pilotCommand('RECORD_EXTERNAL_EFFECT',{eventType:$('externalType').value,outcome:$('externalOutcome').value,assumptions:[],evidenceRefs:[]});
+  $('externalStatus').innerHTML='<span class="badge sim">SIMULATED_EXTERNAL_EFFECT recorded</span>';
+  $('externalOutcome').value='';diag(j);
+}
+
+$('loginBtn').onclick=()=>login().catch(e=>say(e.message,'risk'));
+$('refreshEntry').onclick=()=>refreshEntry().catch(e=>say(e.message,'risk'));
+$('createPortfolio').onclick=()=>entryCommand('CREATE_PORTFOLIO',{portfolioName:$('portfolioName').value}).catch(e=>say(e.message,'risk'));
+$('addProperty').onclick=()=>entryCommand('ADD_PROPERTY',{
+  portfolioId:$('propertyPortfolio').value,displayName:$('propertyName').value,propertyType:$('propertyType').value||null,
+  address:{street:$('street').value||null,city:$('city').value||null,province:$('province').value||null,country:$('country').value||null}
+}).catch(e=>say(e.message,'risk'));
+$('startProject').onclick=async()=>{try{
+  activeDomain='KITCHEN';renderDomainIntents();
+  const j=await entryCommand('START_PROJECT',{propertyId:$('projectProperty').value,domainCode:'KITCHEN',programName:$('programName').value,ownerDisplayName:'Property Owner'});
+  const id=j.data?.result?.projectId;if(id)await selectProject(id);
+}catch(e){say(e.message,'risk')}};
+$('loadWorkspace').onclick=()=>loadWorkspace().catch(e=>say(e.message,'risk'));
+$('loadJourney').onclick=()=>loadJourney().catch(e=>say(e.message,'risk'));
+$('initPilot').onclick=()=>pilotCommand('INITIALIZE_PILOT').then(diag).catch(e=>say(e.message,'risk'));
+$('setRole').onclick=()=>pilotCommand('SET_ACTIVE_SHADOW_ROLE',{role:$('shadowRole').value}).then(diag).catch(e=>say(e.message,'risk'));
+$('selectIntent').onclick=()=>intentCommand('SELECT_PROJECT_INTENT',selectedIntentPayload()).then(diag).catch(e=>say(e.message,'risk'));
+$('updateIntentDraft').onclick=()=>intentCommand('UPDATE_PROJECT_INTENT_DRAFT',selectedIntentPayload()).then(diag).catch(e=>say(e.message,'risk'));
+$('reviseIntent').onclick=()=>intentCommand('REVISE_PROJECT_INTENT',selectedIntentPayload(true)).then(j=>{ $('intentChangeReason').value='';say('Intent revision created. Prior history and valid C02 evidence were preserved; current preliminary outputs must now be rebuilt from the revised intent.','good');diag(j); }).catch(e=>say(e.message==='INTENT_REVISION_REQUIRES_GOVERNED_REBASELINE'?'This project already has a governed baseline/readiness state. Use the governed rebaseline/change path instead of revising C01 intent.':e.message,'risk'));
+$('confirmIntent').onclick=()=>intentCommand('CONFIRM_PROJECT_INTENT',{intentPackageId:lastIntentPackageId}).then(diag).catch(e=>say(e.message,'risk'));
+$('loadPrelim').onclick=()=>loadPrelim().catch(e=>say(e.message,'risk'));
+$('previewPrelim').onclick=()=>prelim(false).then(diag).catch(e=>say(e.message,'risk'));
+$('submitPrelim').onclick=()=>prelim(true).then(diag).catch(e=>say(e.message,'risk'));
+$('uploadEvidence').onclick=()=>uploadEvidence().catch(e=>say(e.message,'risk'));
+$('reviewPilotMedia').onclick=()=>reviewPilotMedia().catch(e=>say(e.message,'risk'));
+$('sendPilotAiMessage').onclick=()=>askPilotAssistant().catch(e=>say(e.message,'risk'));
+$('recordExternal').onclick=()=>recordExternal().catch(e=>say(e.message,'risk'));
+$('viewEstimate').onclick=()=>estimate(false).catch(e=>say(e.message,'risk'));
+$('issueEstimate').onclick=()=>estimate(true).catch(e=>say(e.message,'risk'));
+$('viewReview').onclick=()=>review(null).catch(e=>say(e.message,'risk'));
+$('completeScreening').onclick=()=>review('COMPLETE_PRELIMINARY_REGULATORY_SCREENING').catch(e=>say(e.message,'risk'));
+$('recordDecision').onclick=()=>review('RECORD_PRELIMINARY_CUSTOMER_DECISION').catch(e=>say(e.message,'risk'));
+$('recordShadowPrelimDecision').onclick=()=>recordShadowPreliminaryDecision().catch(e=>say(e.message,'risk'));
+$('startShadowAssessment').onclick=()=>pilotCommand('START_SHADOW_ASSESSMENT').then(diag).catch(e=>say(e.message,'risk'));
+$('completeShadowAssessment').onclick=()=>pilotCommand('COMPLETE_SHADOW_ASSESSMENT').then(diag).catch(e=>say(e.message,'risk'));
+$('createDesignHandoff').onclick=()=>pilotCommand('CREATE_SHADOW_DESIGN_HANDOFF').then(diag).catch(e=>say(e.message,'risk'));
+$('refreshDesignDeps').onclick=()=>pilotCommand('REFRESH_SHADOW_DESIGN_DEPENDENCIES').then(diag).catch(e=>say(e.message,'risk'));
+$('createWorkPackages').onclick=()=>pilotCommand('CREATE_SHADOW_WORK_PACKAGES').then(diag).catch(e=>say(e.message,'risk'));
+$('startShadowExecution').onclick=()=>pilotCommand('START_SHADOW_EXECUTION').then(diag).catch(e=>say(e.message,'risk'));
+$('refreshExecutionDeps').onclick=()=>pilotCommand('REFRESH_SHADOW_EXECUTION_DEPENDENCIES').then(diag).catch(e=>say(e.message,'risk'));
+$('recordHiddenCondition').onclick=()=>pilotCommand('RECORD_SHADOW_HIDDEN_CONDITION',{
+  workPackageId:selectedWP(),condition:$('hiddenCondition').value,
+  evidenceRefs:csvList($('shadowExecEvidence').value),provenance:'REAL_OBSERVED'
+}).then(diag).catch(e=>say(e.message,'risk'));
+$('createShadowCR').onclick=()=>pilotCommand('CREATE_SHADOW_CHANGE_REQUEST',{
+  workPackageId:selectedWP(),description:$('crDescription').value,scopeImpact:$('crScopeImpact').value,
+  costImpact:$('crCostImpact').value||'UNKNOWN',scheduleImpact:$('crScheduleImpact').value||'UNKNOWN',
+  technicalDependencies:[]
+}).then(diag).catch(e=>say(e.message,'risk'));
+$('decideShadowCR').onclick=()=>pilotCommand('DECIDE_SHADOW_CHANGE_REQUEST',{
+  changeRequestId:selectedCR(),decision:$('shadowCRDecision').value,note:null
+}).then(diag).catch(e=>say(e.message,'risk'));
+$('applyShadowCR').onclick=()=>pilotCommand('APPLY_SHADOW_CHANGE_REVISION',{changeRequestId:selectedCR()}).then(diag).catch(e=>say(e.message,'risk'));
+$('recordShadowCompletion').onclick=()=>pilotCommand('RECORD_SHADOW_COMPLETION',{
+  workPackageId:selectedWP(),evidenceRefs:csvList($('shadowExecEvidence').value),note:$('completionNote').value
+}).then(diag).catch(e=>say(e.message,'risk'));
+$('recordShadowInspection').onclick=()=>pilotCommand('RECORD_SHADOW_INSPECTION',{
+  workPackageId:selectedWP(),decision:$('inspectionDecision').value,note:$('inspectionNote').value
+}).then(diag).catch(e=>say(e.message,'risk'));
+$('recordShadowAcceptance').onclick=()=>pilotCommand('RECORD_SHADOW_CUSTOMER_ACCEPTANCE',{
+  decision:$('shadowAcceptance').value,note:$('acceptanceNote').value
+}).then(diag).catch(e=>say(e.message,'risk'));
+$('issueShadowRFU').onclick=()=>pilotCommand('ISSUE_SHADOW_READY_FOR_USE').then(diag).catch(e=>say(e.message,'risk'));
+$('loadRealAssessment').onclick=()=>loadRealAssessment().catch(e=>say(e.message,'risk'));
+$('prepareRealAssessment').onclick=()=>{
+  const expertRoleAssignmentId=$('realAssessmentExpertRole').value.trim();
+  if(!expertRoleAssignmentId){say('Existing active Assessment Expert role assignment ID is required for preparation.','risk');return;}
+  const confirmedUnchangedModuleCodes=[],changedOrUncertainModuleCodes=[];
+  document.querySelectorAll('[data-reuse-module]').forEach(el=>{
+    const moduleCode=el.dataset.reuseModule;
+    if(!moduleCode)return;
+    if(el.value==='UNCHANGED')confirmedUnchangedModuleCodes.push(moduleCode);
+    else if(el.value==='CHANGED_OR_UNCERTAIN')changedOrUncertainModuleCodes.push(moduleCode);
+  });
+  const note=$('realAssessmentReuseNote')?.value?.trim()||null;
+  realAssessmentCommand('PREPARE_EXPERT_ASSESSMENT',{
+    expertRoleAssignmentId,
+    reuseConditionReview:{confirmedUnchangedModuleCodes:[...new Set(confirmedUnchangedModuleCodes)],changedOrUncertainModuleCodes:[...new Set(changedOrUncertainModuleCodes)],note}
+  }).catch(e=>say(e.message,'risk'));
+};
+$('startRealAssessment').onclick=()=>realAssessmentCommand('START_EXPERT_ASSESSMENT',{}).catch(e=>say(e.message,'risk'));
+$('submitRealAssessment').onclick=()=>realAssessmentCommand('SUBMIT_EXPERT_ASSESSMENT',{}).catch(e=>say(e.message,'risk'));
+$('loadC03').onclick=()=>loadC03().catch(e=>say(e.message,'risk'));
+$('inviteC03').onclick=()=>inviteC03().catch(e=>say(e.message,'risk'));
+$('submitC03').onclick=()=>submitC03().catch(e=>say(e.message,'risk'));
+$('verifyCapability').onclick=()=>verifyParticipantCapability().catch(e=>say(e.message,'risk'));
+$('verifyOnboardingScreening').onclick=()=>verifyParticipantOnboardingScreening().catch(e=>say(e.message,'risk'));
+$('createDesignInvite').onclick=()=>createParticipantInvite('DESIGN').catch(e=>say(e.message,'risk'));
+$('createProfessionalInvite').onclick=()=>createParticipantInvite('PROFESSIONAL').catch(e=>say(e.message,'risk'));
+$('loadGovernedLifecycle').onclick=()=>loadGovernedLifecycle().catch(e=>say(e.message,'risk'));
+$('confirmFactualReview').onclick=()=>governedWorkspaceCommand('CONFIRM_FACTUAL_REVIEW',{disputedFacts:[],comment:'Kitchen pilot factual review confirmed.',evidenceRefs:[]}).catch(e=>say(e.message,'risk'));
+$('issueInputBaseline').onclick=()=>governedWorkspaceCommand('ISSUE_PROJECT_INPUT_BASELINE',{}).catch(e=>say(e.message,'risk'));
+$('runT3Readiness').onclick=()=>governedWorkspaceCommand('RUN_TECHNICAL_READINESS_REVIEW',{}).catch(e=>say(e.message,'risk'));
+$('runT3Command').onclick=()=>{let p={};try{p=JSON.parse($('t3Payload').value||'{}')}catch{say('INVALID_T3_JSON','risk');return}governedWorkspaceCommand($('t3Command').value,p).catch(e=>say(e.message,'risk'))};
+$('loadT45').onclick=()=>loadT45().catch(e=>say(e.message,'risk'));
+$('runT45Command').onclick=()=>runT45Command().catch(e=>say(e.message,'risk'));
+$('runT5Approval').onclick=()=>runT5ActorApproval().catch(e=>say(e.message,'risk'));
+$('runT5Baseline').onclick=()=>runT5Baseline().catch(e=>say(e.message,'risk'));
+$('startFunctionalPlanning').onclick=()=>pilotCommand('START_FUNCTIONAL_PLANNING').then(diag).catch(e=>say(e.message,'risk'));
+
+$('buildCustomerConcept').onclick=()=>conceptAction('BUILD_PRELIMINARY_CONCEPT').catch(e=>say(e.message,'risk'));
+$('reviseCustomerConcept').onclick=()=>conceptAction('REQUEST_CONCEPT_REVISION').catch(e=>say(e.message,'risk'));
+$('acceptCustomerConcept').onclick=()=>conceptAction('ACCEPT_CONCEPT_FOR_EXPERT_REVIEW').catch(e=>say(e.message,'risk'));
+$('deferCustomerConcept').onclick=()=>conceptAction('DEFER_PRELIMINARY_CONCEPT').catch(e=>say(e.message,'risk'));
+activeDomain='KITCHEN';renderDomainIntents();
+loadConfig().catch(e=>say('Configuration error: '+e.message,'risk'));
+</script>
+</body></html>
