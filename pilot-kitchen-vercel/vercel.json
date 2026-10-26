@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/config",
+      "destination": "https://lauklxfbtujkqepnktrc.supabase.co/functions/v1/rid-kitchen-pilot-ui/config"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://lauklxfbtujkqepnktrc.supabase.co/functions/v1/rid-kitchen-pilot-ui/api/:path*"
+    },
+    {
+      "source": "/auth/:path*",
+      "destination": "https://lauklxfbtujkqepnktrc.supabase.co/auth/:path*"
+    }
+  ]
+}
